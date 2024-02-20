@@ -17,7 +17,8 @@ RUN ln -snf /usr/share/zoneinfo/${CONTAINER_TIMEZONE} /etc/localtime && \
 	/usr/sbin/update-locale LANG="${LC_ALL}" && \
     install2.r --error --skipinstalled shiny shinyjs tidyverse psych DT \
                                        ggplot2 ggpubr ggrepel radiant.data \
-                                       scales data.table bslib shinyBS && \
+                                       scales data.table bslib shinyBS \
+                                       shinycssloaders && \
     apt autoremove --purge -y && \
     apt autoclean && \
     apt-get clean && \

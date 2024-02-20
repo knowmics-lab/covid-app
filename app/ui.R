@@ -9,6 +9,7 @@ library(ggrepel)
 library(radiant.data)
 library(scales)
 library(data.table)
+library(shinycssloaders)
 
 source("AppFunctions.R")
 
@@ -20,15 +21,21 @@ fluidPage(
       "Temporal analysis",
       shinyjs::useShinyjs(),
       fluidRow(
-        column(2, selectizeInput("mutationTemp", "Select one or more mutations", choices = NULL, multiple = T)),
+        column(
+          2, 
+          selectizeInput(
+            "mutationTemp", "Select one or more mutations", 
+            choices = NULL, multiple = TRUE
+          )
+        ),
         column(2, downloadButton("downTempPlot", "Download temporal plot (.png)", style = "margin-top:32px")),
         column(3, downloadButton("downTempData", "Download temporal plot data (.csv)", style = "margin-top:32px")),
         column(2, downloadButton("downCladePlot", "Download pie plot (.png)", style = "margin-top:32px")),
         column(3, downloadButton("downCladeData", "Download pie plot data (.csv)", style = "margin-top:32px"))
       ),
       fluidRow(
-        column(6, plotOutput("plotTemp", height = "700px")),
-        column(6, plotOutput("plotClade", height = "350px"))
+        column(6, plotOutput("plotTemp", height = "700px") %>% withSpinner()),
+        column(6, plotOutput("plotClade", height = "350px") %>% withSpinner())
       )
     ),
     tabPanel(
@@ -43,7 +50,7 @@ fluidPage(
         column(3, downloadButton("downCorrPlotData", "Download correlation plot data (.csv)", style = "margin-top:32px"))
       ),
       fluidRow(
-        column(6, DTOutput("tableCorr")),
+        column(6, DTOutput("tableCorr") %>% withSpinner()),
         column(
           6,
           fluidRow(column(12,
@@ -52,7 +59,12 @@ fluidPage(
               selected = c("Show regression line"), inline = T
             )
           )),
-          fluidRow(column(12, plotOutput("plotCorr", height = "700px")))
+          fluidRow(
+            column(
+              12, 
+              plotOutput("plotCorr", height = "700px") %>% withSpinner()
+            )
+          )
         )
       )
     )
