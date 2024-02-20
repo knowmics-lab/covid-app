@@ -1,14 +1,43 @@
 read.mutation.data <- function(input.file) {
-  mutation.data <- fread(input.file, header = T, check.names = F, data.table = F)
-  mutation.data <- mutation.data[, -ncol(mutation.data)]
-  mutation.data$month <- sub("_21", " 2021", mutation.data$month)
-  mutation.data$month <- sub("_22", " 2022", mutation.data$month)
-  Sys.setlocale("LC_TIME", "C")
-  dates <- as.Date(paste0("1", mutation.data$month), format = "%d%b %Y")
-  mutation.data <- mutation.data[order(dates), ]
-  mutation.data$month <- factor(mutation.data$month, levels = unique(mutation.data$month))
-  mutation.data$clade <- factor(mutation.data$clade)
-  return(mutation.data)
+  cache.path <- paste0(input.file, ".rds")
+  if (file.exists(cache.path)) {
+    return(readRDS(cache.path))
+  } else {
+    mutation.data <- fread(input.file, header = T, check.names = F, data.table = F)
+    mutation.data <- mutation.data[, -ncol(mutation.data)]
+    mutation.data$month <- sub("_21", " 2021", mutation.data$month)
+    mutation.data$month <- sub("_22", " 2022", mutation.data$month)
+    Sys.setlocale("LC_TIME", "C")
+    dates <- as.Date(paste0("1", mutation.data$month), format = "%d%b %Y")
+    mutation.data <- mutation.data[order(dates), ]
+    mutation.data$month <- factor(mutation.data$month, levels = unique(mutation.data$month))
+    mutation.data$clade <- factor(mutation.data$clade)
+    saveRDS(mutation.data, cache.path)
+    return(mutation.data)
+  }
+}
+
+read_clades_correlations <- function(input_file) {
+  cache_path <- paste0(input_file, ".rds")
+  if (file.exists(cache_path)) {
+    return(readRDS(cache_path))
+  } else {
+    clade_correlations <- fread(input_file,
+      header = TRUE, check.names = FALSE, data.table = FALSE
+    )
+    saveRDS(clade_correlations, cache_path)
+    return(clade_correlations)
+  }
+}
+
+read_cached <- function(fn, cache_file) {
+  if (file.exists(cache_file)) {
+    return(readRDS(cache_file))
+  } else {
+    data <- fn()
+    saveRDS(data, cache_file)
+    return(data)
+  }
 }
 
 compute.temporal.rates <- function(mutation.data) {
@@ -185,11 +214,15 @@ make.correlation.plot <- function(temporal.pair.rates, corr.plot.opt) {
   return(mut.rate.plot)
 }
 
+
+
 mutation.data <- read.mutation.data("data/MutationMatrix.txt")
-clade.correlations <- fread("data/corrClades.txt",
-  header = TRUE,
-  check.names = FALSE, 
-  data.table = FALSE
+clade.correlations <- read_clades_correlations("data/corrClades.txt")
+temporal.rates <- read_cached(
+  fn = function() (compute.temporal.rates(mutation.data)),
+  cache_file = "data/temporalRates.rds"
 )
-temporal.rates <- compute.temporal.rates(mutation.data)
-clade.rates <- compute.clade.rates(mutation.data)
+clade.rates <- read_cached(
+  fn = function() (compute.clade.rates(mutation.data)),
+  cache_file = "data/cladeRates.rds"
+)
