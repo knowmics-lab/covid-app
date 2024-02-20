@@ -4,10 +4,10 @@ ARG CONTAINER_TIMEZONE="GMT"
 ENV LANG en_US.UTF-8 
 ENV LC_ALL en_US.UTF-8
 
-RUN useradd docker \
-	&& mkdir /home/docker \
-	&& chown docker:docker /home/docker \
-	&& addgroup docker staff && \
+RUN useradd docker && \
+    mkdir /home/docker && \
+    chown docker:docker /home/docker && \
+    addgroup docker staff && \
     ln -snf /usr/share/zoneinfo/${CONTAINER_TIMEZONE} /etc/localtime && \
     echo ${CONTAINER_TIMEZONE} > /etc/timezone && \
     apt update --fix-missing && \
@@ -38,4 +38,6 @@ USER docker
 COPY app /app/shiny
 COPY Rprofile.site /usr/lib/R/etc/Rprofile.site
 EXPOSE 3838
-CMD ["R", "-e", "shiny::runApp('/app/shiny')"]
+WORKDIR /app/shiny
+
+# CMD ["R", "-e", "shiny::runApp('/app/shiny')"] # Uncomment this to run the app without shinyproxy
