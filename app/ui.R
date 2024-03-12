@@ -22,13 +22,15 @@ fluidPage(
           ),
           fluidRow(
             column(2,downloadButton("downRatePlot","Download temporal plot (.png)",style = 'margin-bottom:16px')),
-            column(4,downloadButton("downRateData","Download temporal plot data (.csv)",style = 'margin-bottom:16px')),
+            column(2,downloadButton("downRateData","Download temporal plot data (.csv)",style = 'margin-bottom:16px')),
             column(2,downloadButton("downCladePlot","Download pie plot (.png)",style = 'margin-bottom:16px')),
-            column(4,downloadButton("downCladeData","Download pie plot data (.csv)",style = 'margin-bottom:16px'))
+            column(2,downloadButton("downCladeData","Download pie plot data (.csv)",style = 'margin-bottom:16px'))
           ),
           fluidRow(
-            column(6,plotOutput("plotRate",height="700px") %>% withSpinner()),
-            column(6,plotOutput("plotClade",height="350px") %>% withSpinner())
+            column(12,plotOutput("plotRate",height="700px") %>% withSpinner())
+          ),
+          fluidRow(
+            column(12,plotOutput("plotClade",height="700px") %>% withSpinner())
           )
       ),
       tabPanel("Correlation analysis",
