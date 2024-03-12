@@ -92,7 +92,7 @@ function(input, output, session) {
       shinyjs::disable('downCladeData')
     }}, height=function(){
       if(length(input$mutationRate)>0)
-        400*ceiling(length(input$mutationRate)/2)
+        500*ceiling(length(input$mutationRate)/3)
       else
         "auto"
       }, res = 96)
@@ -176,7 +176,7 @@ function(input, output, session) {
       paste0(input$countryRate,"_",input$regionRate,"_",paste0(input$mutationRate,collapse="_"),"_cladePie.png")
     },
     content = function(file) {
-      ggsave(file,make.clade.plot(mutation.rates(),input$mutationRate),width=4500,height=3000,units="px",bg = "white")
+      ggsave(file,make.clade.plot(mutation.rates(),input$mutationRate),width=6000,height=3000,units="px",bg = "white")
     },
     contentType = "text/png"
   )

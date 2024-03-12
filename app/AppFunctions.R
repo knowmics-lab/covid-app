@@ -25,9 +25,9 @@ make.temporal.plot <- function(mutation.rates, mutation.set)
 
 make.clade.plot <- function(mutation.rates,mutation.set)
 {
-  clade.rates <- mutation.rates[mutation.rates$Mutation %in% mutation.set,grepl("Rate",names(mutation.rates)),drop=F]
-  list.clades <- unique(unlist(strsplit(names(clade.rates),"_"))[seq(1,ncol(clade.rates)*2,2)])
-  pie.data <- data.frame(mutation=rep(mutation.set,each=ncol(clade.rates)/2),
+  clade.rates <- mutation.rates[mutation.rates$Mutation %in% mutation.set,grepl("Mutation|Rate",names(mutation.rates)),drop=F]
+  list.clades <- unique(unlist(strsplit(names(clade.rates)[-1],"_"))[seq(1,(ncol(clade.rates)-1)*2,2)])
+  pie.data <- data.frame(mutation=rep(clade.rates$Mutation,each=(ncol(clade.rates)-1)/2),
              clade=rep(list.clades,length(mutation.set)),
              cladeRate=as.numeric(t(clade.rates[,grepl("_relRate",names(clade.rates))])),
              absRate=as.numeric(t(clade.rates[,grepl("_absRate",names(clade.rates))])))
@@ -64,13 +64,13 @@ make.clade.plot <- function(mutation.rates,mutation.set)
     #mutation.pie.plot
     pie.plot.list[[mutation]] <- mutation.pie.plot
   }
-  if(length(pie.plot.list)==4) {
-    nrow <- 2
-    ncol <- 2
-  } else {
-    nrow <- ceiling(length(pie.plot.list)/2) 
-    ncol <- min(length(pie.plot.list),2)
-  }
+  # if(length(pie.plot.list)==4) {
+  #   nrow <- 2
+  #   ncol <- 2
+  # } else {
+    nrow <- ceiling(length(pie.plot.list)/3) 
+    ncol <- min(length(pie.plot.list),3)
+  # }
   final.plot <- ggarrange(plotlist = pie.plot.list, nrow = nrow, ncol = ncol, legend="right")
   final.plot <- annotate_figure(final.plot,top=text_grob("AR: Absolute Rate, CR: Clade Rate", face="bold", size=13))
   #final.plot
@@ -92,7 +92,7 @@ make.correlation.plot <- function(mutation.rates,corr.plot.opt)
   mut.rate.plot <- ggplot(temporal.pair.rates, aes(x=mut1, y=mut2)) + 
     geom_point(size=2, position=position_jitter(h=0.01,w=0.01)) +
     #geom_smooth(formula = y ~ x,method="glm") +
-    geom_text_repel(label=temporal.pair.rates$time, max.overlaps = 100, segment.color = 'transparent', size=5) +
+    geom_text_repel(label=temporal.pair.rates$time, max.overlaps = 100, segment.color = 'transparent', size=4) +
     scale_x_continuous(breaks=seq(0,100,10),limits=c(-5,105)) +
     scale_y_continuous(breaks=seq(0,100,10),limits=c(-5,105)) +
     labs(x=paste0("Mutation rate ",mut.names[1]," (%)"),y=paste0("Mutation rate ",mut.names[2]," (%)")) + theme_bw() +
