@@ -1,171 +1,190 @@
-library(shiny)
-library(shinyjs)
-library(shinycssloaders)
-library(DT)
-library(ggplot2)
-library(RColorBrewer)
-library(ggrepel)
-library(ggpubr)
-
-source("AppFunctions.R")
-
 function(input, output, session) {
   
-  updateSelectizeInput(session,"countryRate",
-                       choices=unique(c("All",metadata$Country)), 
-                       server=T)
+  #thematic::thematic_shiny()
   
-  updateSelectizeInput(session,"countryCorr",
-                       choices=unique(c("All",metadata$Country)), 
-                       server=T)
+  observe(
+    if(length(input$mutations)>0) {
+      shinyjs::show('external')
+      shinyjs::show('runSearch')
+    } else {
+      shinyjs::hide('external')
+      shinyjs::hide('runSearch')
+      shinyjs::hide('netmeSource')
+      shinyjs::hide('netmePapers')
+    }
+  )
   
-  observeEvent(input$countryRate, {
-    list.regions <- metadata[metadata$Country==input$countryRate,"Region"]
-    updateSelectizeInput(session, "regionRate",
-                         choices=unique(c("All",list.regions)), server=TRUE)
-  })
-  
-  observeEvent(input$countryCorr, {
-    list.regions <- metadata[metadata$Country==input$countryCorr,"Region"]
-    updateSelectizeInput(session, "regionCorr",
-                         choices=unique(c("All",list.regions)), server=TRUE)
-  })
-  
-  mutation.rates <- reactive({
-    if(input$countryRate!="" && input$regionRate!="")
-      readRDS(paste0("Data/Rates/",input$countryRate,"_",input$regionRate,".rds"))
-  })
-  
-  clade.corr <- reactive({
-    if(input$countryCorr!="" && input$regionCorr!="" && input$cladeCorr!="")
-      readRDS(paste0("Data/Correlations/",input$countryCorr,"_",input$regionCorr,"_",input$cladeCorr,".rds"))
-  })
-  
-  observeEvent(input$countryRate,{
-    if(input$countryRate!="" && input$regionRate!="")
-      updateSelectizeInput(session,"mutationRate",choices=mutation.rates()$Mutation,server=T)
-  })
-  
-  observeEvent(input$regionRate,{
-    if(input$countryRate!="" && input$regionRate!="")
-      updateSelectizeInput(session,"mutationRate",choices=mutation.rates()$Mutation,server=T)
-  })
-  
-  observeEvent(input$countryCorr,{
-    if(input$countryCorr!="" && input$regionCorr!="")
-    {
-      list.clades <- metadata[metadata$Country==input$countryCorr & metadata$Region==input$regionCorr,"Clade"]
-      updateSelectizeInput(session,"cladeCorr",choices=unique(c("All",list.clades)),server=T)
+  observeEvent(input$external,{
+    if(input$external=="Pubmed") {
+      shinyjs::hide('netmeSource')
+      shinyjs::hide('netmePapers')
+    } else {
+      shinyjs::show('netmeSource')
+      shinyjs::show('netmePapers')
     }
   })
   
-  observeEvent(input$regionCorr,{
-    if(input$countryCorr!="" && input$regionCorr!="")
-    {
-      list.clades <- metadata[metadata$Country==input$countryCorr & metadata$Region==input$regionCorr,"Clade"]
-      updateSelectizeInput(session,"cladeCorr",choices=unique(c("All",list.clades)),server=T)
+  observeEvent(input$runSearch,{
+    query <- unlist(strsplit(input$mutations,":"))
+    query <- query[seq(2,length(query),2)]
+    search.type <- "full-text"
+    if(input$netmeSource=="Abstracts")
+      search.type <- "abstract"
+    if(input$external=="Pubmed") {
+      browseURL(paste0("https://pubmed.ncbi.nlm.nih.gov/?term=",paste0(query,collapse="+")))
+    } else {
+      req <- request("http://netme.click:8092/send_data")
+      req <- req_body_json(req,list(queryMode="pubmed",input=paste0(query,collapse=" "),networkName=paste0(paste0(query,collapse=" ")," network"),searchOn="terms",
+                                       searchType=search.type,papersNumber=input$netmePapers,sortType="relevance"))
+      resp <- req_perform(req)
+      browseURL(paste0("https://netme.click/#/results/",resp_body_json(resp)$query_id))
     }
   })
   
-  observeEvent(input$cladeCorr, {
-    if(input$cladeCorr!="")
-      updateSelectizeInput(session,"mutationCorr",selected="",choices=sort(unique(c(clade.corr()$`Mutation 1`,clade.corr()$`Mutation 2`))), server=TRUE)
+  updateSelectizeInput(session,"country", choices=unique(metadata$Country), server=T)
+
+  observeEvent(input$country, {
+    list.regions <- as.character(metadata[metadata$Country==input$country,"Region"])
+    updateSelectizeInput(session, "region", choices=unique(c("All",list.regions)), server=TRUE)
+  })
+
+  mutation.rates <- eventReactive(list(input$country,input$region),{
+    if(any(metadata$Country==input$country & metadata$Region==input$region))
+      readRDS(paste0("Data/Rates/",input$country,"_",input$region,".rds"))
+  },ignoreInit = T)
+
+  clade.corr <- eventReactive(list(input$country,input$region),{
+    if(any(metadata$Country==input$country & metadata$Region==input$region))
+      readRDS(paste0("Data/Correlations/",input$country,"_",input$region,".rds"))
+  }, ignoreInit = T)
+
+  observeEvent(list(input$country,input$region),{
+    freezeReactiveValue(input,"mutations")
+    if(any(metadata$Country==input$country & metadata$Region==input$region))
+      updateSelectizeInput(session,"mutations",choices=mutation.rates()$Mutation,server=T)
   })
   
-  output$plotRate <- renderPlot({
-    if(length(input$mutationRate)>0) {
-      shinyjs::enable('downRatePlot')
-      shinyjs::enable('downRateData')
-      make.temporal.plot(mutation.rates(),input$mutationRate)
+  output$plotRate <- renderUI({
+    if(length(input$mutations)>0) {
+      shinyjs::show('downRatePlot')
+      shinyjs::show('downRateData')
     } else {
-      shinyjs::disable('downRatePlot')
-      shinyjs::disable('downRateData')
-    }}, res = 96)
-  
-  output$plotClade <- renderPlot({
-    if(length(input$mutationRate)>0) {
-      shinyjs::enable('downCladePlot')
-      shinyjs::enable('downCladeData')
-      make.clade.plot(mutation.rates(),input$mutationRate)
+      shinyjs::hide('downRatePlot')
+      shinyjs::hide('downRateData')
+    }
+    if(length(input$mutations)>0) {
+      plot.rate <- make.temporal.plot(mutation.rates(),input$mutations)
+      plot.rate <- ggplotly(plot.rate, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
+        layout(hoverlabel = list(font=list(size=17)))
+      box(width=12, height=600, solidHeader = T, renderPlotly(plot.rate))
+    }
+    })
+
+  output$plotClade <- renderUI({
+    if(length(input$mutations)>0) {
+      shinyjs::show('downCladePlot')
+      shinyjs::show('downCladeData')
     } else {
-      shinyjs::disable('downCladePlot')
-      shinyjs::disable('downCladeData')
-    }}, height=function(){
-      if(length(input$mutationRate)>0)
-        500*ceiling(length(input$mutationRate)/3)
-      else
-        "auto"
-      }, res = 96)
+      shinyjs::hide('downCladePlot')
+      shinyjs::hide('downCladeData')
+    }
+    if(length(input$mutations)>0) {
+      clade.plots <- make.clade.interactive.plot(mutation.rates(),input$mutations)
+      lapply(input$mutations, function(mut) {
+        box(width=4, solidHeader=T, renderPlotly(clade.plots[[mut]]))
+      })
+    }
+  })
 
   output$tableCorr <- DT::renderDT({
-    if(length(input$mutationCorr)==0)
-      head(clade.corr(),100000)
-    else if(length(input$mutationCorr)==1)
-      clade.corr()[clade.corr()$`Mutation 1` %in% input$mutationCorr | clade.corr()$`Mutation 2` %in% input$mutationCorr,]
-    else
-      clade.corr()[(clade.corr()$`Mutation 1` %in% input$mutationCorr & clade.corr()$`Mutation 2` %in% input$mutationCorr) |
-                     (clade.corr()$`Mutation 2` %in% input$mutationCorr & clade.corr()$`Mutation 1` %in% input$mutationCorr),]
-    }, options = list(dom = "ltp", pageLength = 20), rownames=F, selection="single")
-
-  output$plotCorr <- renderPlot({
-    row <- input$tableCorr_rows_selected
-    if(!is.null(row))
-    {
-      shinyjs::enable('downCorrPlot')
-      shinyjs::enable('downCorrPlotData')
-      shinyjs::enable('plotCorrOpt')
-      if(length(input$mutationCorr)==0)
-        vals <- clade.corr()[row,c(1,2)]
-      else if(length(input$mutationCorr)==1)
-        vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutationCorr | clade.corr()$`Mutation 2` %in% input$mutationCorr,])[row,c(1,2)]
-      else
-        vals <- (clade.corr()[(clade.corr()$`Mutation 1` %in% input$mutationCorr & clade.corr()$`Mutation 2` %in% input$mutationCorr) |
-                              (clade.corr()$`Mutation 2` %in% input$mutationCorr & clade.corr()$`Mutation 1` %in% input$mutationCorr),])[row,c(1,2)]
-      temp.rates <- readRDS(paste0("Data/Rates/",input$countryCorr,"_",input$regionCorr,".rds"))
-      temp.rates <- temp.rates[temp.rates$Mutation==vals[1,1] | temp.rates$Mutation==vals[1,2],]
-      make.correlation.plot(temp.rates,input$plotCorrOpt)
+    corr.table <- clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,]
+    corr.table <- corr.table[,1:6]
+    corr.table <- datatable(corr.table, selection="single", rownames=F, filter="top", options = list(
+      dom = "tp", pageLength = 25,
+      rowCallback = JS(
+        "function(row, data) {",
+        "$('td:eq(4)', row).html(data[4].toExponential(2));",
+        "$('td:eq(5)', row).html(data[5].toExponential(2));",
+        "}")
+    )
+    )
+    if(length(input$mutations)>0) {
+      if(nrow(corr.table$x$data)>0) {
+        shinyjs::show('downCorrTab')
+      } else {
+        shinyjs::hide('downCorrTab')
+      }
+      return(corr.table)
     } else {
-      shinyjs::disable('downCorrPlot')
-      shinyjs::disable('downCorrPlotData')
-      shinyjs::disable('plotCorrOpt')
+      shinyjs::hide('downCorrTab')
+      return(NULL)
+    }
+  })
+
+  output$plotCorr <- renderUI({
+    if(length(input$mutations)>0)
+    {
+      row <- input$tableCorr_rows_selected
+      if(!is.null(row)) {
+        shinyjs::show('downCorrPlot')
+        shinyjs::show('downCorrPlotData')
+        shinyjs::show('plotCorrOpt')
+      } else {
+        shinyjs::hide('downCorrPlot')
+        shinyjs::hide('downCorrPlotData')
+        shinyjs::hide('plotCorrOpt')
+      }
+      if(!is.null(row)) {
+        vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2")]
+        temp.rates <- mutation.rates()[mutation.rates()$Mutation==vals[1,1] | mutation.rates()$Mutation==vals[1,2],,drop=F]
+        plot.corr <- make.correlation.interactive.plot(temp.rates,input$plotCorrOpt)
+        box(width=12, height=600, solidHeader = T, renderPlotly(plot.corr))
+      }
+    } else {
+      shinyjs::hide('downCorrPlot')
+      shinyjs::hide('downCorrPlotData')
+      shinyjs::hide('plotCorrOpt')
     }
   })
   
+  output$plotHeatmap <- renderUI({
+    if(length(input$mutations)>0)
+    {
+      row <- input$tableCorr_rows_selected
+      if(!is.null(row)) {
+        vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2","Cont00","Cont01","Cont10","Cont11")]
+        heatmap.plot <- make.heatmap.plot(vals[1,1],vals[1,2],as.numeric(vals[1,-c(1,2)]))
+        box(width=7, height=400, solidHeader = T, renderPlotly(heatmap.plot))
+      }
+    }
+  })
+
   output$downCorrTab <- downloadHandler(
     filename = function() {
-      if(length(input$mutationCorr)==0)
-        paste0(input$countryCorr,"_",input$regionCorr,"_",input$cladeCorr,"_signCorr.csv")
-      else
-        paste0(input$countryCorr,"_",input$regionCorr,"_",input$cladeCorr,"_",paste0(input$mutationCorr,collapse="_"),"_signCorr.csv")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_signCorr.csv")
     },
     content = function(file) {
-      if(length(input$mutationCorr)==0)
-        write_csv(clade.corr(), file)
-      else if(length(input$mutationCorr)==1)
-        write_csv(clade.corr()[clade.corr()$`Mutation 1` %in% input$mutationCorr | clade.corr()$`Mutation 2` %in% input$mutationCorr,], file)
-      else
-        write_csv(clade.corr()[(clade.corr()$`Mutation 1` %in% input$mutationCorr & clade.corr()$`Mutation 2` %in% input$mutationCorr) |
-                               (clade.corr()$`Mutation 2` %in% input$mutationCorr & clade.corr()$`Mutation 1` %in% input$mutationCorr),], file)
+      write_csv(clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,], file)
     },
     contentType = "text/csv"
   )
 
   output$downRatePlot <- downloadHandler(
     filename = function() {
-      paste0(input$countryRate,"_",input$regionRate,"_",paste0(input$mutationRate,collapse="_"),"_temporalPlot.png")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_temporalPlot.png")
     },
     content = function(file) {
-      ggsave(file,make.temporal.plot(mutation.rates(),input$mutationRate),width=4500,height=3000,units="px")
+      ggsave(file,make.temporal.plot(mutation.rates(),input$mutations),width=4500,height=3000,units="px")
     },
     contentType = "text/png"
   )
 
   output$downRateData <- downloadHandler(
     filename = function() {
-      paste0(input$countryRate,"_",input$regionRate,"_",paste0(input$mutationRate,collapse="_"),"_temporalRates.csv")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_temporalRates.csv")
     },
     content = function(file) {
-      sub.mutation.rates <- mutation.rates()[mutation.rates()$Mutation %in% input$mutationRate,!grepl("Rate",names(mutation.rates()))]
+      sub.mutation.rates <- mutation.rates()[mutation.rates()$Mutation %in% input$mutations,!grepl("Rate",names(mutation.rates()))]
       write_csv(sub.mutation.rates,file)
     },
     contentType = "text/csv"
@@ -173,20 +192,20 @@ function(input, output, session) {
 
   output$downCladePlot <- downloadHandler(
     filename = function() {
-      paste0(input$countryRate,"_",input$regionRate,"_",paste0(input$mutationRate,collapse="_"),"_cladePie.png")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladePie.png")
     },
     content = function(file) {
-      ggsave(file,make.clade.plot(mutation.rates(),input$mutationRate),width=6000,height=3000,units="px",bg = "white")
+      ggsave(file,make.clade.plot(mutation.rates(),input$mutations),width=6000,height=3000,units="px",bg = "white")
     },
     contentType = "text/png"
   )
 
   output$downCladeData <- downloadHandler(
     filename = function() {
-      paste0(input$countryRate,"_",input$regionRate,"_",paste0(input$mutationRate,collapse="_"),"_cladeRates.csv")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladeRates.csv")
     },
     content = function(file) {
-      sub.mutation.rates <- mutation.rates()[mutation.rates()$Mutation %in% input$mutationRate,grepl("Rate|Mutation",names(mutation.rates()))]
+      sub.mutation.rates <- mutation.rates()[mutation.rates()$Mutation %in% input$mutations,grepl("Rate|Mutation",names(mutation.rates()))]
       write_csv(sub.mutation.rates,file)
     },
     contentType = "text/csv"
@@ -195,26 +214,13 @@ function(input, output, session) {
   output$downCorrPlot <- downloadHandler(
     filename = function() {
       row <- input$tableCorr_rows_selected
-      if(length(input$mutationCorr)==0)
-        vals <- clade.corr()[row,c(1,2)]
-      else if(length(input$mutationCorr)==1)
-        vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutationCorr | clade.corr()$`Mutation 2` %in% input$mutationCorr,])[row,c(1,2)]
-      else
-        vals <- (clade.corr()[(clade.corr()$`Mutation 1` %in% input$mutationCorr & clade.corr()$`Mutation 2` %in% input$mutationCorr) |
-                                (clade.corr()$`Mutation 2` %in% input$mutationCorr & clade.corr()$`Mutation 1` %in% input$mutationCorr),])[row,c(1,2)]
+      vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2")]
       paste0(vals[1,1],"_",vals[1,2],"_correlationPlot.png")
     },
     content = function(file) {
       row <- input$tableCorr_rows_selected
-      if(length(input$mutationCorr)==0)
-        vals <- clade.corr()[row,c(1,2)]
-      else if(length(input$mutationCorr)==1)
-        vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutationCorr | clade.corr()$`Mutation 2` %in% input$mutationCorr,])[row,c(1,2)]
-      else
-        vals <- (clade.corr()[(clade.corr()$`Mutation 1` %in% input$mutationCorr & clade.corr()$`Mutation 2` %in% input$mutationCorr) |
-                              (clade.corr()$`Mutation 2` %in% input$mutationCorr & clade.corr()$`Mutation 1` %in% input$mutationCorr),])[row,c(1,2)]
-      temp.rates <- readRDS(paste0("Data/Rates/",input$countryCorr,"_",input$regionCorr,".rds"))
-      temp.rates <- temp.rates[temp.rates$Mutation==vals[1,1] | temp.rates$Mutation==vals[1,2],]
+      vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2")]
+      temp.rates <- mutation.rates()[mutation.rates()$Mutation==vals[1,1] | mutation.rates()$Mutation==vals[1,2],,drop=F]
       ggsave(file,make.correlation.plot(temp.rates,input$plotCorrOpt),width=4500,height=3000,units="px")
     },
     contentType = "text/png"
@@ -223,26 +229,13 @@ function(input, output, session) {
   output$downCorrPlotData <- downloadHandler(
     filename = function() {
       row <- input$tableCorr_rows_selected
-      if(length(input$mutationCorr)==0)
-        vals <- clade.corr()[row,c(1,2)]
-      else if(length(input$mutationCorr)==1)
-        vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutationCorr | clade.corr()$`Mutation 2` %in% input$mutationCorr,])[row,c(1,2)]
-      else
-        vals <- (clade.corr()[(clade.corr()$`Mutation 1` %in% input$mutationCorr & clade.corr()$`Mutation 2` %in% input$mutationCorr) |
-                                (clade.corr()$`Mutation 2` %in% input$mutationCorr & clade.corr()$`Mutation 1` %in% input$mutationCorr),])[row,c(1,2)]
+      vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2")]
       paste0(vals[1,1],"_",vals[1,2],"_correlationPlotData.csv")
     },
     content = function(file) {
       row <- input$tableCorr_rows_selected
-      if(length(input$mutationCorr)==0)
-        vals <- clade.corr()[row,c(1,2)]
-      else if(length(input$mutationCorr)==1)
-        vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutationCorr | clade.corr()$`Mutation 2` %in% input$mutationCorr,])[row,c(1,2)]
-      else
-        vals <- (clade.corr()[(clade.corr()$`Mutation 1` %in% input$mutationCorr & clade.corr()$`Mutation 2` %in% input$mutationCorr) |
-                                (clade.corr()$`Mutation 2` %in% input$mutationCorr & clade.corr()$`Mutation 1` %in% input$mutationCorr),])[row,c(1,2)]
-      temp.rates <- readRDS(paste0("Data/Rates/",input$countryCorr,"_",input$regionCorr,".rds"))
-      temp.rates <- temp.rates[temp.rates$Mutation==vals[1,1] | temp.rates$Mutation==vals[1,2],]
+      vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2")]
+      temp.rates <- mutation.rates()[mutation.rates()$Mutation==vals[1,1] | mutation.rates()$Mutation==vals[1,2],,drop=F]
       if("Use clades" %in% input$plotCorrOpt)
       {
         temp.rates <- temp.rates[,grepl("_relRate|Mutation",names(temp.rates))]
@@ -254,5 +247,6 @@ function(input, output, session) {
     },
     contentType = "text/csv"
   )
-  
+
 }
+
