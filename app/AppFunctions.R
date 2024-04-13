@@ -203,3 +203,5 @@ make.heatmap.plot <- function(mut1, mut2, counts)
 
 metadata <- data.frame(do.call(rbind, strsplit(gsub(".rds","",list.files("Data/Correlations")),"_")))
 names(metadata) <- c("Country","Region")
+global.mutation.rates <- readRDS("Data/Rates/All_All.rds")
+global.clade.corr <- readRDS("Data/Correlations/All_All.rds")

@@ -2,17 +2,19 @@ function(input, output, session) {
   
   #thematic::thematic_shiny()
   
-  observe(
+  observe({
     if(length(input$mutations)>0) {
       shinyjs::show('external')
-      shinyjs::show('runSearch')
+      if(input$external=="NetMe") {
+        shinyjs::show('netmeSource')
+        shinyjs::show('netmePapers')
+      }
     } else {
       shinyjs::hide('external')
-      shinyjs::hide('runSearch')
       shinyjs::hide('netmeSource')
       shinyjs::hide('netmePapers')
     }
-  )
+  })
   
   observeEvent(input$external,{
     if(input$external=="Pubmed") {
@@ -24,20 +26,33 @@ function(input, output, session) {
     }
   })
   
-  observeEvent(input$runSearch,{
-    query <- unlist(strsplit(input$mutations,":"))
-    query <- query[seq(2,length(query),2)]
-    search.type <- "full-text"
-    if(input$netmeSource=="Abstracts")
-      search.type <- "abstract"
-    if(input$external=="Pubmed") {
-      browseURL(paste0("https://pubmed.ncbi.nlm.nih.gov/?term=",paste0(query,collapse="+")))
-    } else {
-      req <- request("http://netme.click:8092/send_data")
-      req <- req_body_json(req,list(queryMode="pubmed",input=paste0(query,collapse=" "),networkName=paste0(paste0(query,collapse=" ")," network"),searchOn="terms",
+  observeEvent(
+    eventExpr = {
+      input$mutations
+      input$external
+    },
+    handlerExpr = {
+    if(length(input$mutations)>0)
+    {
+      query <- unlist(strsplit(input$mutations,":"))
+      query <- query[seq(2,length(query),2)]
+      search.type <- "full-text"
+      if(input$netmeSource=="Abstracts")
+        search.type <- "abstract"
+      if(input$external=="Pubmed") {
+        link <- paste0("https://pubmed.ncbi.nlm.nih.gov/?term=",paste0(query,collapse="+"))
+      } else {
+        req <- request("http://netme.click:8092/send_data")
+        req <- req_body_json(req,list(queryMode="pubmed",input=paste0(query,collapse=" "),networkName=paste0(paste0(query,collapse=" ")," network"),searchOn="terms",
                                        searchType=search.type,papersNumber=input$netmePapers,sortType="relevance"))
-      resp <- req_perform(req)
-      browseURL(paste0("https://netme.click/#/results/",resp_body_json(resp)$query_id))
+        resp <- req_perform(req)
+        link <- paste0("https://netme.click/#/results/",resp_body_json(resp)$query_id)
+      }
+      url <- a(p("Run search", class = "btn btn-default action-button" , style = "fontweight:600; margin-left:20px;"), 
+               target = "_blank", href = link)
+      output$extLink <- renderUI({ tagList(url) })
+    } else {
+      output$extLink <- renderUI("")
     }
   })
   
@@ -49,13 +64,23 @@ function(input, output, session) {
   })
 
   mutation.rates <- eventReactive(list(input$country,input$region),{
-    if(any(metadata$Country==input$country & metadata$Region==input$region))
-      readRDS(paste0("Data/Rates/",input$country,"_",input$region,".rds"))
+    if(any(metadata$Country==input$country & metadata$Region==input$region)) {
+      if(input$country=="All" && input$region=="All") {
+        global.mutation.rates
+      } else {
+        readRDS(paste0("Data/Rates/",input$country,"_",input$region,".rds"))
+      }
+    }
   },ignoreInit = T)
 
   clade.corr <- eventReactive(list(input$country,input$region),{
-    if(any(metadata$Country==input$country & metadata$Region==input$region))
-      readRDS(paste0("Data/Correlations/",input$country,"_",input$region,".rds"))
+    if(any(metadata$Country==input$country & metadata$Region==input$region)) {
+      if(input$country=="All" && input$region=="All") {
+        global.clade.corr
+      } else {
+        readRDS(paste0("Data/Correlations/",input$country,"_",input$region,".rds"))
+      }
+    }
   }, ignoreInit = T)
 
   observeEvent(list(input$country,input$region),{

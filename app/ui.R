@@ -24,7 +24,7 @@ sidebar <- dashboardSidebar(
     hidden(radioButtons("external","Search on:",c("Pubmed","NetMe"))),
     hidden(selectInput("netmeSource","Literature source",c("Full-text articles","Abstracts"))),
     hidden(selectInput("netmePapers","Papers to use",c("10","20","50","100"))),
-    hidden(actionButton("runSearch","Run search",lib="glyphicon",icon=icon("search"),style="margin-top:30px"))
+    uiOutput("extLink")
   )
 )
 
