@@ -25,6 +25,11 @@ RUN ln -snf /usr/share/zoneinfo/${CONTAINER_TIMEZONE} /etc/localtime && \
     rm -rf /srv/shiny-server/*
 
 COPY app /srv/shiny-server
+
+RUN chown -R shiny:shiny /srv/shiny-server && \
+    mkdir -p /srv/shiny-server/app_cache && \
+    chmod 777 /srv/shiny-server/app_cache
+
 COPY Rprofile.site /usr/local/lib/R/etc/Rprofile.site
 USER shiny
 EXPOSE 3838
