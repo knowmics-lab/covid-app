@@ -17,12 +17,14 @@ function(input, output, session) {
   })
   
   observeEvent(input$external,{
+    if(length(input$mutations)>0) {
     if(input$external=="Pubmed") {
       shinyjs::hide('netmeSource')
       shinyjs::hide('netmePapers')
     } else {
       shinyjs::show('netmeSource')
       shinyjs::show('netmePapers')
+    }
     }
   })
   
@@ -35,7 +37,7 @@ function(input, output, session) {
     if(length(input$mutations)>0)
     {
       query <- unlist(strsplit(input$mutations,":"))
-      query <- query[seq(2,length(query),2)]
+      query <- c("sars-cov-2",query[seq(2,length(query),2)])
       search.type <- "full-text"
       if(input$netmeSource=="Abstracts")
         search.type <- "abstract"
@@ -56,13 +58,24 @@ function(input, output, session) {
     }
   })
   
-  updateSelectizeInput(session,"country", choices=unique(metadata$Country), server=T)
-
+  updatePickerInput(session, "country", choices=unique(metadata$Country), 
+                    choicesOpt = list(content = c("All",sapply(unique(metadata$Country)[-1],build.country.icon))))
+  
   observeEvent(input$country, {
     list.regions <- as.character(metadata[metadata$Country==input$country,"Region"])
-    updateSelectizeInput(session, "region", choices=unique(c("All",list.regions)), server=TRUE)
+    updatePickerInput(session, "region", choices=unique(c("All",list.regions)))
+    updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
   })
-
+  
+  observeEvent(input$region,{
+      updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
+  })
+  
+  observeEvent(input$mutations, {
+    updatePickerInput(session,"mutations",choices = unique(c(input$mutations,mutation.rates()$Mutation)),
+                      selected = input$mutations)
+  })
+  
   mutation.rates <- eventReactive(list(input$country,input$region),{
     if(any(metadata$Country==input$country & metadata$Region==input$region)) {
       if(input$country=="All" && input$region=="All") {
@@ -82,12 +95,6 @@ function(input, output, session) {
       }
     }
   }, ignoreInit = T)
-
-  observeEvent(list(input$country,input$region),{
-    freezeReactiveValue(input,"mutations")
-    if(any(metadata$Country==input$country & metadata$Region==input$region))
-      updateSelectizeInput(session,"mutations",choices=mutation.rates()$Mutation,server=T)
-  })
   
   output$plotRate <- renderUI({
     if(length(input$mutations)>0) {
