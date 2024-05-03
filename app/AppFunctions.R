@@ -201,6 +201,13 @@ make.heatmap.plot <- function(mut1, mut2, counts)
   return(final.plot)
 }
 
+build.country.icon <- function(country) {
+  shiny::HTML(paste(
+    tags$img(src=paste0("https://alpha.dmi.unict.it/~gmicale/Icons/",country,".png"), width=30, height=22),
+    country
+  ))
+}
+
 metadata <- data.frame(do.call(rbind, strsplit(gsub(".rds","",list.files("Data/Correlations")),"_")))
 names(metadata) <- c("Country","Region")
 global.mutation.rates <- readRDS("Data/Rates/All_All.rds")

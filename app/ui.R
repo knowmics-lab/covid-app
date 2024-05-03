@@ -1,4 +1,5 @@
 library(shiny)
+library(shinyWidgets)
 library(shinydashboard)
 library(shinyjs)
 library(shinycssloaders)
@@ -18,10 +19,10 @@ header <- dashboardHeader(title = span("CovidTGIApp", style = "color: white; fon
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
-    selectizeInput("country","Country", choices=NULL),
-    selectizeInput("region","Region/State", choices=NULL),
-    selectizeInput("mutations","Mutations", choices=NULL, multiple = T, options = list(maxOptions = 100000L)),
-    hidden(radioButtons("external","Search on:",c("Pubmed","NetMe"))),
+    pickerInput("country","Country",choices=NULL, options = list(size=10, style="picker")),
+    pickerInput("region","Region/State", choices=NULL, options = list(size=10, style = "picker")),
+    pickerInput("mutations","Mutations", choices=NULL, multiple = T, options = list(`live-search`=TRUE, size=10, style = "picker")),
+    hidden(radioButtons("external","Search on:",c("NetMe","Pubmed"))),
     hidden(selectInput("netmeSource","Literature source",c("Full-text articles","Abstracts"))),
     hidden(selectInput("netmePapers","Papers to use",c("10","20","50","100"))),
     uiOutput("extLink")
@@ -52,8 +53,10 @@ body <- dashboardBody(
     ),
     tags$head(tags$style(sass(sass_file("www/bootswatch-lumen.scss")))),
     tags$head(tags$style(HTML('.box{-webkit-box-shadow: none; -moz-box-shadow: none;box-shadow: none; font-size: 18px;}'))),
-    tags$head(tags$style(HTML(".main-sidebar { font-size: 20px; }"))),
-    tags$head(tags$style(HTML(".selectize-input { font-size: 18px; line-height: 20px;} .selectize-dropdown { font-size: 18px; line-height: 20px; }")))
+    tags$head(tags$style(HTML(".main-sidebar { font-size: 20px;}"))),
+    tags$head(tags$style(HTML(".selectize-input { font-size: 18px; line-height: 20px;} .selectize-dropdown { font-size: 18px; line-height: 20px; }"))),
+    tags$head(tags$style(HTML(".dropdown-menu ul li:nth-child(n) a { color: black !important; font-size: 18px;}"))),
+    tags$head(tags$style(HTML(".picker {font-size: 16px; color: black;}")))
   )
 )
 
