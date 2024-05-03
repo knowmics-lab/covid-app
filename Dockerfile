@@ -15,7 +15,7 @@ RUN ln -snf /usr/share/zoneinfo/${CONTAINER_TIMEZONE} /etc/localtime && \
     echo "${LC_ALL} UTF-8" >> /etc/locale.gen && \
 	locale-gen "${LC_ALL}" && \
 	/usr/sbin/update-locale LANG="${LC_ALL}" && \
-    install2.r --error --skipinstalled shiny shinydashboard shinyjs DT \
+    install2.r --error --skipinstalled shiny shinyWidgets shinydashboard shinyjs DT \
                                        ggplot2 RColorBrewer ggpubr ggrepel plotly \
                                        readr sass httr2 shinycssloaders && \
     apt autoremove --purge -y && \
