@@ -1,8 +1,0 @@
-OK - Precisione p-value
-OK - Lista mutazioni (alcune mutazioni non ci sono)
-OK - P-value corretto (Q-value, Benjamini)
-OK - Tabella di contingenza
-- Uniformare colori dei clade nei pie-plot
-OK - Inserire search nelle colonne della tabella delle correlazioni
-- Sistemare link esterni Pubmed e NetMe
-

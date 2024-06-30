@@ -12,10 +12,11 @@ library(plotly)
 library(readr)
 library(sass)
 library(httr2)
+library(openxlsx)
 
 source("AppFunctions.R")
 
-header <- dashboardHeader(title = span("CovidTGIApp", style = "color: white; font-size: 25px"))
+header <- dashboardHeader(title = span("CovidTGIApp", style = "color: white; font-size: 24px"))
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
@@ -34,29 +35,29 @@ body <- dashboardBody(
   fluidRow(
     box(width=12,title="Mutation rates",status="primary",solidHeader = T,collapsible = T,
             hidden(downloadButton("downRatePlot","Download plot (.png)")),
-            hidden(downloadButton("downRateData","Download data (.csv)")),
+            hidden(downloadButton("downRateData","Download data (.xlsx)")),
             uiOutput("plotRate") %>% withSpinner()
     ),
     box(width=12,title="Clade frequencies",status="primary",solidHeader = T,collapsible = T,
         hidden(downloadButton("downCladePlot","Download plot (.png)")),
-        hidden(downloadButton("downCladeData","Download data (.csv)")),
+        hidden(downloadButton("downCladeData","Download data (.xlsx)")),
         uiOutput("plotClade") %>% withSpinner()
     ),
     box(width=12,title="Correlations",status="primary",solidHeader = T,collapsible = T,
-        box(solidHeader=T, width=5, hidden(downloadButton("downCorrTab", "Download table (.csv)")),
+        box(solidHeader=T, width=5, hidden(downloadButton("downCorrTab", "Download table (.xlsx)")),
             DTOutput("tableCorr") %>% withSpinner()),
         box(solidHeader=T, width=7, hidden(downloadButton("downCorrPlot", "Download plot (.png)")),
-            hidden(downloadButton("downCorrPlotData", "Download plot data (.csv)")),
+            hidden(downloadButton("downCorrPlotData", "Download plot data (.xlsx)")),
             hidden(checkboxGroupInput("plotCorrOpt", "", c("Use clades","Show regression line"),selected=c("Show regression line"),inline=T)),
             uiOutput("plotCorr") %>% withSpinner(),
             uiOutput("plotHeatmap") %>% withSpinner())
     ),
     tags$head(tags$style(sass(sass_file("www/bootswatch-lumen.scss")))),
-    tags$head(tags$style(HTML('.box{-webkit-box-shadow: none; -moz-box-shadow: none;box-shadow: none; font-size: 18px;}'))),
-    tags$head(tags$style(HTML(".main-sidebar { font-size: 20px;}"))),
-    tags$head(tags$style(HTML(".selectize-input { font-size: 18px; line-height: 20px;} .selectize-dropdown { font-size: 18px; line-height: 20px; }"))),
-    tags$head(tags$style(HTML(".dropdown-menu ul li:nth-child(n) a { color: black !important; font-size: 18px;}"))),
-    tags$head(tags$style(HTML(".picker {font-size: 16px; color: black;}")))
+    tags$head(tags$style(HTML('.box{-webkit-box-shadow: none; -moz-box-shadow: none;box-shadow: none; font-size: 16px;}'))),
+    tags$head(tags$style(HTML(".main-sidebar { font-size: 18px;}"))),
+    tags$head(tags$style(HTML(".selectize-input { font-size: 16px; line-height: 18px;} .selectize-dropdown { font-size: 16px; line-height: 18px; }"))),
+    tags$head(tags$style(HTML(".dropdown-menu ul li:nth-child(n) a { color: black !important; font-size: 16px;}"))),
+    tags$head(tags$style(HTML(".picker {font-size: 14px; color: black;}")))
   )
 )
 
