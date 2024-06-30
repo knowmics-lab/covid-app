@@ -130,13 +130,13 @@ function(input, output, session) {
 
   output$tableCorr <- DT::renderDT({
     corr.table <- clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,]
-    corr.table <- corr.table[,1:6]
+    corr.table <- corr.table[,c("Clade","Mutation 1","Mutation 2","Correlation","FDR")]
     corr.table <- datatable(corr.table, selection="single", rownames=F, filter="top", options = list(
       dom = "tp", pageLength = 25,
       rowCallback = JS(
         "function(row, data) {",
         "$('td:eq(4)', row).html(data[4].toExponential(2));",
-        "$('td:eq(5)', row).html(data[5].toExponential(2));",
+        #"$('td:eq(5)', row).html(data[5].toExponential(2));",
         "}")
     )
     )
@@ -193,12 +193,19 @@ function(input, output, session) {
 
   output$downCorrTab <- downloadHandler(
     filename = function() {
-      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_signCorr.csv")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_corr.xlsx")
     },
     content = function(file) {
-      write_csv(clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,], file)
+      wb <- createWorkbook()
+      output.file <- paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"))
+      output.file <- gsub(":",".",output.file)
+      addWorksheet(wb,output.file)
+      data <- clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,]
+      names(data)[grep("Cont",names(data))] <- c("Absent-Absent","Absent-Present","Present-Absent","Present-Present")
+      writeDataTable(wb, 1, data, startRow = 1, startCol = 1)
+      saveWorkbook(wb,file)
     },
-    contentType = "text/csv"
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
   output$downRatePlot <- downloadHandler(
@@ -206,20 +213,25 @@ function(input, output, session) {
       paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_temporalPlot.png")
     },
     content = function(file) {
-      ggsave(file,make.temporal.plot(mutation.rates(),input$mutations),width=4500,height=3000,units="px")
+      ggsave(file,make.temporal.plot(mutation.rates(),input$mutations),width=6000,height=2000,units="px")
     },
     contentType = "text/png"
   )
 
   output$downRateData <- downloadHandler(
     filename = function() {
-      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_temporalRates.csv")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_temporalRates.xlsx")
     },
     content = function(file) {
       sub.mutation.rates <- mutation.rates()[mutation.rates()$Mutation %in% input$mutations,!grepl("Rate",names(mutation.rates()))]
-      write_csv(sub.mutation.rates,file)
+      wb <- createWorkbook()
+      output.file <- paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"))
+      output.file <- gsub(":",".",output.file)
+      addWorksheet(wb,output.file)
+      writeDataTable(wb, 1, sub.mutation.rates, startRow = 1, startCol = 1)
+      saveWorkbook(wb,file)
     },
-    contentType = "text/csv"
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
   output$downCladePlot <- downloadHandler(
@@ -234,13 +246,20 @@ function(input, output, session) {
 
   output$downCladeData <- downloadHandler(
     filename = function() {
-      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladeRates.csv")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladeRates.xlsx")
     },
     content = function(file) {
       sub.mutation.rates <- mutation.rates()[mutation.rates()$Mutation %in% input$mutations,grepl("Rate|Mutation",names(mutation.rates()))]
-      write_csv(sub.mutation.rates,file)
+      names(sub.mutation.rates) <- gsub("absRate","cladeFrequency",names(sub.mutation.rates))
+      names(sub.mutation.rates) <- gsub("relRate","cladeMutationRate",names(sub.mutation.rates))
+      wb <- createWorkbook()
+      output.file <- paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"))
+      output.file <- gsub(":",".",output.file)
+      addWorksheet(wb,output.file)
+      writeDataTable(wb, 1, sub.mutation.rates, startRow = 1, startCol = 1)
+      saveWorkbook(wb,file)
     },
-    contentType = "text/csv"
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
   output$downCorrPlot <- downloadHandler(
@@ -262,11 +281,15 @@ function(input, output, session) {
     filename = function() {
       row <- input$tableCorr_rows_selected
       vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2")]
-      paste0(vals[1,1],"_",vals[1,2],"_correlationPlotData.csv")
+      paste0(vals[1,1],"_",vals[1,2],"_correlationPlotData.xlsx")
     },
     content = function(file) {
       row <- input$tableCorr_rows_selected
       vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2")]
+      wb <- createWorkbook()
+      output.file <- paste0(vals[1,1],"_",vals[1,2])
+      output.file <- gsub(":",".",output.file)
+      addWorksheet(wb,output.file)
       temp.rates <- mutation.rates()[mutation.rates()$Mutation==vals[1,1] | mutation.rates()$Mutation==vals[1,2],,drop=F]
       if("Use clades" %in% input$plotCorrOpt)
       {
@@ -275,9 +298,10 @@ function(input, output, session) {
       }
       else
         temp.rates <- temp.rates[,!grepl("Rate",names(temp.rates))]
-      write_csv(temp.rates,file)
+      writeDataTable(wb, 1, temp.rates, startRow = 1, startCol = 1)
+      saveWorkbook(wb,file)
     },
-    contentType = "text/csv"
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
 }

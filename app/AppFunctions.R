@@ -12,7 +12,7 @@ make.temporal.plot <- function(mutation.rates, mutation.set)
     #scale_y_continuous(breaks=seq(0,100,10)) +
     scale_color_discrete(name="") + 
     labs(x="Month",y="Mutation rate (%)") +
-    theme(axis.text.x=element_text(size=12, angle=45, color="black"),
+    theme(axis.text.x=element_text(size=12, angle=60, color="black", vjust = 0.5),
           axis.text.y=element_text(size=12, color="black"),
           axis.title.x=element_text(size=17, face="bold", margin=margin(t=20)),
           axis.title.y=element_text(size=17, face="bold"),
@@ -33,8 +33,20 @@ make.clade.interactive.plot <- function(mutation.rates,mutation.set)
              clade=rep(list.clades,length(mutation.set)),
              cladeRate=as.numeric(t(clade.rates[,grepl("_relRate",names(clade.rates))])),
              absRate=as.numeric(t(clade.rates[,grepl("_absRate",names(clade.rates))])))
-  pie.data <- pie.data[pie.data$absRate!=0,]
-  
+  pie.data <- pie.data[pie.data$absRate>=0.1,]
+  #Added 15 colors (12 colors of Set3 palette + 3 colors of Set1 palette in RColorBrewer)
+  plot.colors <- c("coral", "chartreuse3" ,"cyan","darkgoldenrod2" ,"mediumpurple1", "palevioletred", "violetred1","forestgreen","darkolivegreen3",
+             "skyblue1", "darkseagreen1", "dodgerblue", "burlywood4", "yellow", "grey60","tan1", "darkorchid4", "tomato", "plum1",
+             "darkkhaki", "brown1", "dodgerblue4", "mediumvioletred", "darksalmon", "darkslategray4",
+             "#8DD3C7","#FFFFB3","#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5", "#D9D9D9", "#BC80BD",
+             "#CCEBC5","#FFED6F","#E41A1C","#377EB8","#4DAF4A")
+  names(plot.colors) <- c("19A", "19B" ,"20A", "20B", "20C", "20D", "20E(EU1)" , "20F", "20G", 
+                          "20H(Beta,V2)", "20I(Alpha,V1)", "20J(Gamma,V3)", "21A(Delta)","21B(Kappa)", 
+                          "21C(Epsilon)", "21D(Eta)", "21E(Theta)", "21F(Iota)" , "21G(Lambda)", "21H(Mu)",
+                          "21I(Delta)",  "21J(Delta)", "21K(Omicron)", "21L(Omicron)", "21M(Omicron)",
+                          "22A(Omicron)","22B(Omicron)","22C(Omicron)","22D(Omicron)","22F(Omicron)",
+                          "23A(Omicron)","23B(Omicron)","23C(Omicron)","23D(Omicron)","23F(Omicron)",
+                          "23G(Omicron)","23H(Omicron)","23I(Omicron)","24A(Omicron)","24B(Omicron)") 
   pie.plot.list <- list()
   for(mutation in mutation.set)
   {
@@ -45,11 +57,14 @@ make.clade.interactive.plot <- function(mutation.rates,mutation.set)
     } else {
       mutation.pie.data$pos <- mutation.pie.data$absRate/2
     }
-    mutation.pie.plot <- plot_ly(mutation.pie.data, labels = ~clade, values = ~absRate, type = 'pie', textinfo="none",
-            text = ~paste('Population rate: ', absRate, '%\nClade rate: ',cladeRate,"%"), hoverinfo = 'text',
-            marker = list(line = list(color = 'white', width = 2))) %>%
-    layout(title=list(text=paste0("<b>",mutation,"</b>"),font=list(size=22)), 
-           legend = list(font = list(size = 18)),hoverlabel = list(font = list(size = 17)),
+    mutation.pie.colors <- plot.colors[as.character(mutation.pie.data$clade)]
+    mutation.pie.plot <- plot_ly(mutation.pie.data, labels = ~clade, values = ~absRate, 
+            marker = list(colors = mutation.pie.colors, line = list(color = 'white', width = 2)), 
+            sort=F, type = 'pie', textinfo="none",
+            text = ~paste('<b>',clade,'</b>','\nClade Frequency: ', absRate, '%\nClade Mutation Rate: ',cladeRate,"%"), 
+            hoverinfo = 'text') %>%
+    layout(title=list(text=paste0("<b>",mutation,"</b>"),font=list(size=20)), 
+           legend = list(font = list(size = 16)),hoverlabel = list(font = list(size = 16)),
            margin=list(l = 20, r = 20,b = 20, t = 70)) %>%
     config(displayModeBar = FALSE)
     pie.plot.list[[mutation]] <- mutation.pie.plot
@@ -65,8 +80,19 @@ make.clade.plot <- function(mutation.rates,mutation.set)
                          clade=rep(list.clades,length(mutation.set)),
                          cladeRate=as.numeric(t(clade.rates[,grepl("_relRate",names(clade.rates))])),
                          absRate=as.numeric(t(clade.rates[,grepl("_absRate",names(clade.rates))])))
-  pie.data <- pie.data[pie.data$absRate!=0,]
-  
+  pie.data <- pie.data[pie.data$absRate>=0.1,]
+  plot.colors <- c("coral", "chartreuse3" ,"cyan","darkgoldenrod2" ,"mediumpurple1", "palevioletred", "violetred1","forestgreen","darkolivegreen3",
+                   "skyblue1", "darkseagreen1", "dodgerblue", "burlywood4", "yellow", "grey60","tan1", "darkorchid4", "tomato", "plum1",
+                   "darkkhaki", "brown1", "dodgerblue4", "mediumvioletred", "darksalmon", "darkslategray4",
+                   "#8DD3C7","#FFFFB3","#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5", "#D9D9D9", "#BC80BD",
+                   "#CCEBC5","#FFED6F","#E41A1C","#377EB8","#4DAF4A")
+  names(plot.colors) <- c("19A", "19B" ,"20A", "20B", "20C", "20D", "20E(EU1)" , "20F", "20G", 
+                          "20H(Beta,V2)", "20I(Alpha,V1)", "20J(Gamma,V3)", "21A(Delta)","21B(Kappa)", 
+                          "21C(Epsilon)", "21D(Eta)", "21E(Theta)", "21F(Iota)" , "21G(Lambda)", "21H(Mu)",
+                          "21I(Delta)",  "21J(Delta)", "21K(Omicron)", "21L(Omicron)", "21M(Omicron)",
+                          "22A(Omicron)","22B(Omicron)","22C(Omicron)","22D(Omicron)","22F(Omicron)",
+                          "23A(Omicron)","23B(Omicron)","23C(Omicron)","23D(Omicron)","23F(Omicron)",
+                          "23G(Omicron)","23H(Omicron)","23I(Omicron)","24A(Omicron)","24B(Omicron)")
   pie.plot.list <- list()
   for(mutation in mutation.set)
   {
@@ -77,19 +103,15 @@ make.clade.plot <- function(mutation.rates,mutation.set)
     } else {
       mutation.pie.data$pos <- mutation.pie.data$absRate/2
     }
-    num.clades <- nrow(mutation.pie.data)
-    if(num.clades>11) {
-      plot.colors <- colorRampPalette(brewer.pal(11,"Spectral"))(num.clades)
-    } else {
-      plot.colors <- brewer.pal(num.clades,"Spectral")
-    }
+    mutation.pie.colors <- plot.colors[as.character(mutation.pie.data$clade)]
+    
     mutation.pie.plot <- ggplot(mutation.pie.data, aes(x="", y=absRate, fill=clade)) +
       geom_bar(stat="identity", width=1, color="black") +
       coord_polar("y", start=0) +
-      scale_fill_manual(values = plot.colors) +
+      scale_fill_manual(values = mutation.pie.colors) +
       geom_label_repel(data = mutation.pie.data,
-                        aes(y = pos, label = paste0("PR: ",absRate,"%, CR: ",cladeRate,"%")),
-                        size = 3.5, nudge_x = 1, show.legend = FALSE) +
+                        aes(y = pos, label = paste0("CF: ",absRate,"%, CMR: ",cladeRate,"%")),
+                        size = 3, nudge_x = 1, show.legend = FALSE) +
       theme_void() +
       theme(legend.text=element_text(size=15), legend.title=element_blank(),
             legend.position="right", legend.spacing.y = unit(0.2, 'cm')) +
@@ -158,10 +180,7 @@ make.correlation.plot <- function(pair.rates,corr.plot.opt)
   temporal.pair.rates <- data.frame(time=names(pair.rates),mut1=as.numeric(pair.rates[1,]),mut2=as.numeric(pair.rates[2,]))
   mut.rate.plot <- ggplot(temporal.pair.rates, aes(x=mut1, y=mut2)) + 
     geom_point(size=2, position=position_jitter(h=0.01,w=0.01)) +
-    #geom_smooth(formula = y ~ x,method="glm") +
     geom_text_repel(label=temporal.pair.rates$time, max.overlaps = 100, segment.color = 'transparent', size=4) +
-    scale_x_continuous(breaks=seq(0,100,10),limits=c(-5,105)) +
-    scale_y_continuous(breaks=seq(0,100,10),limits=c(-5,105)) +
     labs(x=paste0("Mutation rate ",mut.names[1]," (%)"),y=paste0("Mutation rate ",mut.names[2]," (%)")) + theme_bw() +
     theme(axis.text.x=element_text(size=15, color="black"),
           axis.text.y=element_text(size=15, color="black"),
