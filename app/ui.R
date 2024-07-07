@@ -16,7 +16,7 @@ library(openxlsx)
 
 source("AppFunctions.R")
 
-header <- dashboardHeader(title = span("CovidTGIApp", style = "color: white; font-size: 24px"))
+header <- dashboardHeader(title = span("CovidTGI", style = "color: white; font-size: 24px"))
 
 sidebar <- dashboardSidebar(
   sidebarMenu(
@@ -61,4 +61,4 @@ body <- dashboardBody(
   )
 )
 
-dashboardPage(header,sidebar,body,title = "CovidTGIApp")
+dashboardPage(header,sidebar,body,title = "CovidTGI")
