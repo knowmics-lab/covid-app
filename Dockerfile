@@ -17,7 +17,7 @@ RUN ln -snf /usr/share/zoneinfo/${CONTAINER_TIMEZONE} /etc/localtime && \
 	/usr/sbin/update-locale LANG="${LC_ALL}" && \
     install2.r --error --skipinstalled shiny shinyWidgets shinydashboard shinyjs DT \
                                        ggplot2 RColorBrewer ggpubr ggrepel plotly \
-                                       readr sass httr2 shinycssloaders openxlsx && \
+                                       readr sass httr2 shinycssloaders openxlsx dplyr tidyr && \
     apt autoremove --purge -y && \
     apt autoclean && \
     apt-get clean && \
