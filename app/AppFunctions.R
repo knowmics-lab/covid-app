@@ -1,14 +1,154 @@
+#Number of colors: 42 (25 + 12 brewer Set1 + 5 brewer Set3)
+#brewer.pal(12,"Set3")
+#brewer.pal(5,"Set1")
+plot.colors <- c("coral", "chartreuse3" ,"cyan","darkgoldenrod2" ,"mediumpurple1", "palevioletred", "violetred1","forestgreen","darkolivegreen3",
+                 "skyblue1", "darkseagreen1", "dodgerblue", "burlywood4", "yellow", "grey60","tan1", "darkorchid4", "tomato", "plum1",
+                 "darkkhaki", "brown1", "dodgerblue4", "mediumvioletred", "darksalmon", "darkslategray4",
+                 "#8DD3C7","#FFFFB3","#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5", "#D9D9D9", "#BC80BD",
+                 "#CCEBC5","#FFED6F","#E41A1C","#377EB8","#4DAF4A","#984EA3","#FF7F00")
+names(plot.colors) <- c("19A", "19B" ,"20A", "20B", "20C", "20D", "20E(EU1)" , "20F", "20G", 
+                        "20H(Beta,V2)", "20I(Alpha,V1)", "20J(Gamma,V3)", "21A(Delta)","21B(Kappa)", 
+                        "21C(Epsilon)", "21D(Eta)", "21E(Theta)", "21F(Iota)" , "21G(Lambda)", "21H(Mu)",
+                        "21I(Delta)",  "21J(Delta)", "21K(Omicron)", "21L(Omicron)", "21M(Omicron)",
+                        "22A(Omicron)","22B(Omicron)","22C(Omicron)","22D(Omicron)","22E(Omicron)","22F(Omicron)",
+                        "23A(Omicron)","23B(Omicron)","23C(Omicron)","23D(Omicron)","23E(Omicron)","23F(Omicron)",
+                        "23G(Omicron)","23H(Omicron)","23I(Omicron)","24A(Omicron)","24B(Omicron)") 
+
+compute.prevalences <- function(clade.prevalences,start.interval,end.interval)
+{
+  # Compute percentages
+  sub.clade.prevalences <- clade.prevalences[,c(1,start.interval:end.interval)]
+  plot.data <- pivot_longer(data= sub.clade.prevalences,
+                            cols = colnames(sub.clade.prevalences[,-1]),
+                            values_to = "Frequency",
+                            names_to = "Time")
+  plot.data$Percentage <- apply(plot.data,1,function(vec){ 
+    as.numeric(vec[3]) / sum(plot.data$Frequency[plot.data$Time==vec[2]]) *100 
+  })
+  plot.data$Percentage <- round(plot.data$Percentage,3)
+  #Remove clades that are not present in that interval of time
+  clade.freqs <- as.data.frame(plot.data  %>%
+                                 group_by(Clade) %>%
+                                 summarise(n = sum(Frequency)))
+  present.clades <- clade.freqs[clade.freqs$n>0,"Clade"]
+  plot.data <- as.data.frame(plot.data[plot.data$Clade %in% present.clades,])
+  return(plot.data)
+}
+
+compute.clade.frequent.mut <- function(clade.mutation.rates,clade.prevalences,clade.set,start.interval,end.interval)
+{
+  if(start.interval==end.interval) {
+    sub.mut.rates <- clade.mutation.rates[clade.mutation.rates$Clade %in% clade.set,c(1,2,3),drop=F]
+    sub.clade.prevalences <- clade.prevalences[clade.prevalences$Clade %in% clade.set,c(1,2),drop=F]
+  } else  {
+    sub.mut.rates <- clade.mutation.rates[clade.mutation.rates$Clade %in% clade.set,c(1,2,start.interval:end.interval),drop=F]
+    sub.clade.prevalences <- clade.prevalences[clade.prevalences$Clade %in% clade.set,c(1,(start.interval-1):(end.interval-1)),drop=F]
+  }
+  sub.mut.rates$Frequency <- rowSums(sub.mut.rates[,3:ncol(sub.mut.rates),drop=F])
+  sub.mut.rates <- sub.mut.rates[sub.mut.rates$Frequency>0,]
+  sub.clade.prevalences$Total <- rowSums(sub.clade.prevalences[,2:ncol(sub.clade.prevalences),drop=F])
+  final.data <- merge(sub.mut.rates,sub.clade.prevalences[,c("Clade","Total")])
+  final.data$Frequency <- round(final.data$Frequency/final.data$Total*100,3)
+  final.data <- final.data[order(final.data$Clade,-final.data$Frequency),]
+  final.data <- final.data[,c("Clade","Mutation","Frequency")]
+  return(final.data)
+}
+
+compute.mut.frequencies <- function(mutation.rates,mutation.set,info)
+{
+  clade.rates <- mutation.rates[mutation.rates$Mutation %in% mutation.set,grepl("Mutation|Rate",names(mutation.rates)),drop=F]
+  list.clades <- unique(unlist(strsplit(names(clade.rates)[-1],"_"))[seq(1,(ncol(clade.rates)-1)*2,2)])
+  plot.data <- data.frame(Mutation=rep(clade.rates$Mutation,each=(ncol(clade.rates)-1)/2),
+                          Clade=rep(list.clades,length(mutation.set)),
+                          Frequency=as.numeric(t(clade.rates[,grepl(info,names(clade.rates))])))
+  plot.data <- plot.data[plot.data$Frequency>0,]
+  plot.data <- plot.data[order(plot.data$Mutation,plot.data$Clade),]
+  return(plot.data)
+}
+
+make.prevalence.plot <- function(plot.data)
+{
+  x.lab <- unique(plot.data$Time)
+  plot.data$Time <- factor(plot.data$Time, levels=x.lab)
+  plot.data$Month <- as.numeric(plot.data$Time)
+  #plot.data$Clade <- factor(plot.data$Clade)
+  prevalence.plot <- ggplot(plot.data, aes(x=Month, y=Percentage, fill=Clade, label=Time)) +
+    geom_area(stat="identity",linewidth=0.2, color="black") +
+    scale_x_continuous(breaks=1:length(x.lab),labels=x.lab) +
+    scale_fill_manual(values=plot.colors[unique(plot.data$Clade)]) +
+    labs(x="Month",y="Prevalence (%)") +
+    theme(axis.text.x=element_text(size=12, angle=60, color="black", vjust = 0.5),
+          axis.text.y=element_text(size=12, color="black"),
+          axis.title.x=element_text(size=17, face="bold", margin=margin(t=20)),
+          axis.title.y=element_text(size=17, face="bold"),
+          legend.text = element_text(size=12),
+          legend.title = element_blank(),
+          axis.line.x = element_line(color="black", linewidth = 0.5),
+          axis.line.y = element_line(color="black", linewidth = 0.5),
+          axis.ticks.length=unit(.25, "cm"),
+          legend.text.align = 0)
+  return(prevalence.plot)
+}
+
+make.clade.frequent.mut.plot <- function(plot.data,topk)
+{
+  plot.list <- list()
+  clade.list <- unique(plot.data$Clade)
+  for(clade in clade.list)
+  {
+    clade.data <- plot.data[plot.data$Clade==clade,]
+    clade.data <- clade.data[1:min(topk,nrow(clade.data)),]
+    clade.data$Mutation <- factor(clade.data$Mutation,levels = clade.data$Mutation)
+    sub.plot <- ggplot(clade.data, aes(x=Mutation, y=Frequency,
+                                     text=paste0(Mutation,"\n<b>Frequency:</b> ",Frequency,"%"))) +
+      ggtitle(clade) + 
+      geom_bar(stat="identity", fill="dodgerblue") +
+      labs(x="Mutation",y="Frequency (%)") +
+      theme(plot.title=element_text(size=18, face="bold", hjust=0.5),
+            axis.text.x=element_text(size=12, angle=60, color="black", vjust = 0.5),
+            axis.text.y=element_text(size=12, color="black"),
+            axis.title.x=element_text(size=17, face="bold", margin=margin(t=20)),
+            axis.title.y=element_text(size=17, face="bold"),
+            legend.text = element_text(size=12),
+            #legend.title = element_blank(),
+            axis.line.x = element_line(color="black", linewidth = 0.5),
+            axis.line.y = element_line(color="black", linewidth = 0.5),
+            axis.ticks.length=unit(.25, "cm"),
+            legend.position="none")
+    plot.list[[clade]] <- sub.plot
+  }
+  return(plot.list)
+}
+
 make.temporal.plot <- function(mutation.rates, mutation.set)
 {
-  temporal.rates <- mutation.rates[mutation.rates$Mutation %in% mutation.set,!grepl("Rate",names(mutation.rates)),drop=F]
-  final.data <- data.frame(mutation=rep(temporal.rates$Mutation,each=ncol(temporal.rates)-1),
+  temporal.rates <- mutation.rates[mutation.rates$Mutation %in% mutation.set,!grepl("Rate|error",names(mutation.rates)),drop=F]
+  error.rates <- mutation.rates[mutation.rates$Mutation %in% mutation.set,grepl("error",names(mutation.rates)),drop=F]
+  if(ncol(error.rates)==0) {
+    final.data <- data.frame(mutation=rep(temporal.rates$Mutation,each=ncol(temporal.rates)-1),
              month=rep(names(temporal.rates)[-1],length(mutation.set)),
              rate=as.numeric(t(temporal.rates[,-1])))
+  } else {
+    final.data <- data.frame(mutation=rep(temporal.rates$Mutation,each=ncol(temporal.rates)-1),
+             month=rep(names(temporal.rates)[-1],length(mutation.set)),
+             rate=as.numeric(t(temporal.rates[,-1])),
+             error=as.numeric(t(error.rates)))
+  }
+  
   final.data$month <- factor(final.data$month,levels=unique(final.data$month))
   
-  temporal.plot <- ggplot(final.data, aes(x=month, y=rate, color=mutation, group=mutation, 
-                                          text=paste0(month,"\n<b>Mutation:</b> ",mutation,"\n","<b>Rate:</b> ",rate,"%"))) + 
-    geom_line(linewidth=1) + geom_point(size=2) +
+  if(ncol(error.rates)==0) {
+    temporal.plot <- ggplot(final.data, aes(x=month, y=rate, color=mutation, group=mutation, 
+                                            text=paste0(month,"\n<b>Mutation:</b> ",mutation,"\n","<b>Rate:</b> ",rate,"%\n","<b>Error:</b> Not Available")))
+  } else {
+    temporal.plot <- ggplot(final.data, aes(x=month, y=rate, color=mutation, group=mutation, 
+                                            text=paste0(month,"\n<b>Mutation:</b> ",mutation,"\n","<b>Rate:</b> ",rate,"%\n","<b>Error:</b> ",ifelse(is.na(error),"Not Available",paste0(error,"%"))))) +
+                     geom_errorbar(aes(ymin = rate-error, ymax = rate+error), width=1.5)
+  }
+  
+  temporal.plot <- temporal.plot + 
+    geom_line(linewidth=0.75) + 
+    geom_point(size=1.5) +
     #scale_y_continuous(breaks=seq(0,100,10)) +
     scale_color_discrete(name="") + 
     labs(x="Month",y="Mutation rate (%)") +
@@ -22,116 +162,40 @@ make.temporal.plot <- function(mutation.rates, mutation.set)
           axis.line.y = element_line(color="black", linewidth = 0.5),
           axis.ticks.length=unit(.25, "cm"),
           legend.text.align = 0)
+  
   return(temporal.plot)
 }
 
-make.clade.interactive.plot <- function(mutation.rates,mutation.set)
+make.mut.frequency.plot <- function(plot.data)
 {
-  clade.rates <- mutation.rates[mutation.rates$Mutation %in% mutation.set,grepl("Mutation|Rate",names(mutation.rates)),drop=F]
-  list.clades <- unique(unlist(strsplit(names(clade.rates)[-1],"_"))[seq(1,(ncol(clade.rates)-1)*2,2)])
-  pie.data <- data.frame(mutation=rep(clade.rates$Mutation,each=(ncol(clade.rates)-1)/2),
-             clade=rep(list.clades,length(mutation.set)),
-             cladeRate=as.numeric(t(clade.rates[,grepl("_relRate",names(clade.rates))])),
-             absRate=as.numeric(t(clade.rates[,grepl("_absRate",names(clade.rates))])))
-  pie.data <- pie.data[pie.data$absRate>=0.1,]
-  #Added 15 colors (12 colors of Set3 palette + 3 colors of Set1 palette in RColorBrewer)
-  plot.colors <- c("coral", "chartreuse3" ,"cyan","darkgoldenrod2" ,"mediumpurple1", "palevioletred", "violetred1","forestgreen","darkolivegreen3",
-             "skyblue1", "darkseagreen1", "dodgerblue", "burlywood4", "yellow", "grey60","tan1", "darkorchid4", "tomato", "plum1",
-             "darkkhaki", "brown1", "dodgerblue4", "mediumvioletred", "darksalmon", "darkslategray4",
-             "#8DD3C7","#FFFFB3","#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5", "#D9D9D9", "#BC80BD",
-             "#CCEBC5","#FFED6F","#E41A1C","#377EB8","#4DAF4A")
-  names(plot.colors) <- c("19A", "19B" ,"20A", "20B", "20C", "20D", "20E(EU1)" , "20F", "20G", 
-                          "20H(Beta,V2)", "20I(Alpha,V1)", "20J(Gamma,V3)", "21A(Delta)","21B(Kappa)", 
-                          "21C(Epsilon)", "21D(Eta)", "21E(Theta)", "21F(Iota)" , "21G(Lambda)", "21H(Mu)",
-                          "21I(Delta)",  "21J(Delta)", "21K(Omicron)", "21L(Omicron)", "21M(Omicron)",
-                          "22A(Omicron)","22B(Omicron)","22C(Omicron)","22D(Omicron)","22F(Omicron)",
-                          "23A(Omicron)","23B(Omicron)","23C(Omicron)","23D(Omicron)","23F(Omicron)",
-                          "23G(Omicron)","23H(Omicron)","23I(Omicron)","24A(Omicron)","24B(Omicron)") 
-  pie.plot.list <- list()
-  for(mutation in mutation.set)
+  plot.list <- list()
+  mutation.list <- unique(plot.data$Mutation)
+  for(mutation in mutation.list)
   {
-    mutation.pie.data <- pie.data[pie.data$mutation==mutation,]
-    mutation.pie.data$csum <- rev(cumsum(rev(mutation.pie.data$absRate)))
-    if(nrow(mutation.pie.data)>1) {
-      mutation.pie.data$pos <- mutation.pie.data$absRate/2 + c(mutation.pie.data$csum[2:nrow(mutation.pie.data)],0)
-    } else {
-      mutation.pie.data$pos <- mutation.pie.data$absRate/2
-    }
-    mutation.pie.colors <- plot.colors[as.character(mutation.pie.data$clade)]
-    mutation.pie.plot <- plot_ly(mutation.pie.data, labels = ~clade, values = ~absRate, 
-            marker = list(colors = mutation.pie.colors, line = list(color = 'white', width = 2)), 
-            sort=F, type = 'pie', textinfo="none",
-            text = ~paste('<b>',clade,'</b>','\nClade Frequency: ', absRate, '%\nClade Mutation Rate: ',cladeRate,"%"), 
-            hoverinfo = 'text') %>%
-    layout(title=list(text=paste0("<b>",mutation,"</b>"),font=list(size=20)), 
-           legend = list(font = list(size = 16)),hoverlabel = list(font = list(size = 16)),
-           margin=list(l = 20, r = 20,b = 20, t = 70)) %>%
-    config(displayModeBar = FALSE)
-    pie.plot.list[[mutation]] <- mutation.pie.plot
+    sub.plot.data <- plot.data[plot.data$Mutation==mutation,]
+    #sub.plot.data <- sub.plot.data[1:min(topk,nrow(sub.plot.data)),]
+    sub.plot.data$Clade <- factor(sub.plot.data$Clade,levels=sub.plot.data$Clade)
+    clade.colors <- plot.colors[as.character(sub.plot.data$Clade)]
+    sub.plot <- ggplot(sub.plot.data, aes(x=Clade, y=Frequency,
+                                          text=paste0(Clade,"\n<b>Frequency:</b> ",Frequency,"%"))) +
+      ggtitle(mutation) + 
+      geom_bar(stat="identity", fill=clade.colors) +
+      #geom_text(aes(label = Frequency), vjust = -0.75, size=3) +
+      labs(x="Clade",y="Frequency (%)") +
+      theme(plot.title=element_text(size=18, face="bold", hjust=0.5),
+            axis.text.x=element_text(size=12, angle=60, color="black", vjust = 0.5),
+            axis.text.y=element_text(size=12, color="black"),
+            axis.title.x=element_text(size=17, face="bold", margin=margin(t=20)),
+            axis.title.y=element_text(size=17, face="bold"),
+            legend.text = element_text(size=12),
+            #legend.title = element_blank(),
+            axis.line.x = element_line(color="black", linewidth = 0.5),
+            axis.line.y = element_line(color="black", linewidth = 0.5),
+            axis.ticks.length=unit(.25, "cm"),
+            legend.position="none")
+    plot.list[[mutation]] <- sub.plot
   }
-  return(pie.plot.list)
-}
-
-make.clade.plot <- function(mutation.rates,mutation.set)
-{
-  clade.rates <- mutation.rates[mutation.rates$Mutation %in% mutation.set,grepl("Mutation|Rate",names(mutation.rates)),drop=F]
-  list.clades <- unique(unlist(strsplit(names(clade.rates)[-1],"_"))[seq(1,(ncol(clade.rates)-1)*2,2)])
-  pie.data <- data.frame(mutation=rep(clade.rates$Mutation,each=(ncol(clade.rates)-1)/2),
-                         clade=rep(list.clades,length(mutation.set)),
-                         cladeRate=as.numeric(t(clade.rates[,grepl("_relRate",names(clade.rates))])),
-                         absRate=as.numeric(t(clade.rates[,grepl("_absRate",names(clade.rates))])))
-  pie.data <- pie.data[pie.data$absRate>=0.1,]
-  plot.colors <- c("coral", "chartreuse3" ,"cyan","darkgoldenrod2" ,"mediumpurple1", "palevioletred", "violetred1","forestgreen","darkolivegreen3",
-                   "skyblue1", "darkseagreen1", "dodgerblue", "burlywood4", "yellow", "grey60","tan1", "darkorchid4", "tomato", "plum1",
-                   "darkkhaki", "brown1", "dodgerblue4", "mediumvioletred", "darksalmon", "darkslategray4",
-                   "#8DD3C7","#FFFFB3","#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5", "#D9D9D9", "#BC80BD",
-                   "#CCEBC5","#FFED6F","#E41A1C","#377EB8","#4DAF4A")
-  names(plot.colors) <- c("19A", "19B" ,"20A", "20B", "20C", "20D", "20E(EU1)" , "20F", "20G", 
-                          "20H(Beta,V2)", "20I(Alpha,V1)", "20J(Gamma,V3)", "21A(Delta)","21B(Kappa)", 
-                          "21C(Epsilon)", "21D(Eta)", "21E(Theta)", "21F(Iota)" , "21G(Lambda)", "21H(Mu)",
-                          "21I(Delta)",  "21J(Delta)", "21K(Omicron)", "21L(Omicron)", "21M(Omicron)",
-                          "22A(Omicron)","22B(Omicron)","22C(Omicron)","22D(Omicron)","22F(Omicron)",
-                          "23A(Omicron)","23B(Omicron)","23C(Omicron)","23D(Omicron)","23F(Omicron)",
-                          "23G(Omicron)","23H(Omicron)","23I(Omicron)","24A(Omicron)","24B(Omicron)")
-  pie.plot.list <- list()
-  for(mutation in mutation.set)
-  {
-    mutation.pie.data <- pie.data[pie.data$mutation==mutation,]
-    mutation.pie.data$csum <- rev(cumsum(rev(mutation.pie.data$absRate)))
-    if(nrow(mutation.pie.data)>1) {
-      mutation.pie.data$pos <- mutation.pie.data$absRate/2 + c(mutation.pie.data$csum[2:nrow(mutation.pie.data)],0)
-    } else {
-      mutation.pie.data$pos <- mutation.pie.data$absRate/2
-    }
-    mutation.pie.colors <- plot.colors[as.character(mutation.pie.data$clade)]
-    
-    mutation.pie.plot <- ggplot(mutation.pie.data, aes(x="", y=absRate, fill=clade)) +
-      geom_bar(stat="identity", width=1, color="black") +
-      coord_polar("y", start=0) +
-      scale_fill_manual(values = mutation.pie.colors) +
-      geom_label_repel(data = mutation.pie.data,
-                        aes(y = pos, label = paste0("CF: ",absRate,"%, CMR: ",cladeRate,"%")),
-                        size = 3, nudge_x = 1, show.legend = FALSE) +
-      theme_void() +
-      theme(legend.text=element_text(size=15), legend.title=element_blank(),
-            legend.position="right", legend.spacing.y = unit(0.2, 'cm')) +
-      guides(fill = guide_legend(byrow = F)) +
-      ggtitle(label=paste0("\n",mutation)) +
-      theme(plot.title = element_text(size=17,hjust = 0.5,face="bold"), plot.margin=unit(c(0,0,0,0), "cm"))
-    #mutation.pie.plot
-    pie.plot.list[[mutation]] <- mutation.pie.plot
-  }
-  if(length(pie.plot.list)==4) {
-    nrow <- 2
-    ncol <- 2
-  } else {
-  nrow <- ceiling(length(pie.plot.list)/3)
-  ncol <- min(length(pie.plot.list),3)
-  }
-  final.plot <- ggarrange(plotlist = pie.plot.list, nrow = nrow, ncol = ncol, legend="right")
-  #final.plot <- annotate_figure(final.plot,top=text_grob("AR: Absolute Rate, CR: Clade Rate", face="bold", size=13))
-  final.plot
-  return(final.plot)
+  return(plot.list)
 }
 
 make.correlation.interactive.plot <- function(pair.rates,corr.plot.opt)
@@ -229,5 +293,7 @@ build.country.icon <- function(country) {
 
 metadata <- data.frame(do.call(rbind, strsplit(gsub(".rds","",list.files("Data/Correlations")),"_")))
 names(metadata) <- c("Country","Region")
+global.clade.prevalences <- readRDS("Data/CladePrevalences/All_All.rds")
+global.clade.mutation.rates <- readRDS("Data/CladeMutationRates/All_All.rds")
 global.mutation.rates <- readRDS("Data/Rates/All_All.rds")
 global.clade.corr <- readRDS("Data/Correlations/All_All.rds")
