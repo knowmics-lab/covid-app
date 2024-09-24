@@ -16,6 +16,20 @@ function(input, output, session) {
     }
   })
   
+  observe({
+    if(length(input$clades)>0) {
+      shinyjs::show('externalClade')
+      if(input$externalClade=="NetMe") {
+        shinyjs::show('netmeSourceClade')
+        shinyjs::show('netmePapersClade')
+      }
+    } else {
+      shinyjs::hide('externalClade')
+      shinyjs::hide('netmeSourceClade')
+      shinyjs::hide('netmePapersClade')
+    }
+  })
+  
   observeEvent(input$external,{
     if(length(input$mutations)>0) {
     if(input$external=="Pubmed") {
@@ -25,6 +39,18 @@ function(input, output, session) {
       shinyjs::show('netmeSource')
       shinyjs::show('netmePapers')
     }
+    }
+  })
+  
+  observeEvent(input$externalClade,{
+    if(length(input$clades)>0) {
+      if(input$externalClade=="Pubmed") {
+        shinyjs::hide('netmeSourceClade')
+        shinyjs::hide('netmePapersClade')
+      } else {
+        shinyjs::show('netmeSourceClade')
+        shinyjs::show('netmePapersClade')
+      }
     }
   })
   
@@ -58,6 +84,35 @@ function(input, output, session) {
     }
   })
   
+  observeEvent(
+    eventExpr = {
+      input$clades
+      input$externalClade
+    },
+    handlerExpr = {
+      if(length(input$clades)>0)
+      {
+        query <- c("sars-cov-2",input$clades)
+        search.type <- "full-text"
+        if(input$netmeSourceClade=="Abstracts")
+          search.type <- "abstract"
+        if(input$externalClade=="Pubmed") {
+          link <- paste0("https://pubmed.ncbi.nlm.nih.gov/?term=",paste0(query,collapse="+"))
+        } else {
+          req <- request("http://netme.click:8092/send_data")
+          req <- req_body_json(req,list(queryMode="pubmed",input=paste0(query,collapse=" "),networkName=paste0(paste0(query,collapse=" ")," network"),searchOn="terms",
+                                        searchType=search.type,papersNumber=input$netmePapersClade,sortType="relevance"))
+          resp <- req_perform(req)
+          link <- paste0("https://netme.click/#/results/",resp_body_json(resp)$query_id)
+        }
+        url <- a(p("Run search", class = "btn btn-default action-button" , style = "fontweight:600; margin-left:20px;"), 
+                 target = "_blank", href = link)
+        output$extLinkClade <- renderUI({ tagList(url) })
+      } else {
+        output$extLinkClade <- renderUI("")
+      }
+  })
+  
   updatePickerInput(session, "country", choices=unique(metadata$Country), 
                     choicesOpt = list(content = c("All",sapply(unique(metadata$Country)[-1],build.country.icon))))
   
@@ -65,15 +120,54 @@ function(input, output, session) {
     list.regions <- as.character(metadata[metadata$Country==input$country,"Region"])
     updatePickerInput(session, "region", choices=unique(c("All",list.regions)))
     updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
+    updatePickerInput(session,"clades",choices=clade.prevalences()$Clade)
+    if(!is.null(clade.prevalences()))
+    {
+      if(ncol(clade.prevalences())<3) {
+        shinyjs::hide('rangePrevalence')
+        shinyjs::hide('rangeCladeMutationRates')
+      } else {
+        shinyjs::show('rangePrevalence')
+        shinyjs::show('rangeCladeMutationRates')
+        updateSliderTextInput(session,"rangePrevalence",choices=colnames(clade.prevalences())[-1],
+                          selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
+        updateSliderTextInput(session,"rangeCladeMutationRates",choices=colnames(clade.prevalences())[-1],
+                          selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
+      }
+    }
   })
   
   observeEvent(input$region,{
-      updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
+    updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
+    updateSliderTextInput(session,"rangePrevalence",choices=colnames(clade.prevalences())[-1],
+                          selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
+    updateSliderTextInput(session,"rangeCladeMutationRates",choices=colnames(clade.prevalences())[-1],
+                          selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
   })
   
   observeEvent(input$mutations, {
     updatePickerInput(session,"mutations",choices = unique(c(input$mutations,mutation.rates()$Mutation)),
                       selected = input$mutations)
+  })
+  
+  clade.prevalences <- eventReactive(list(input$country,input$region),{
+    if(any(metadata$Country==input$country & metadata$Region==input$region)) {
+      if(input$country=="All" && input$region=="All") {
+        global.clade.prevalences
+      } else {
+        readRDS(paste0("Data/CladePrevalences/",input$country,"_",input$region,".rds"))
+      }
+    }
+  })
+  
+  clade.mutation.rates <- eventReactive(list(input$country,input$region),{
+    if(any(metadata$Country==input$country & metadata$Region==input$region)) {
+      if(input$country=="All" && input$region=="All") {
+        global.clade.mutation.rates
+      } else {
+        readRDS(paste0("Data/CladeMutationRates/",input$country,"_",input$region,".rds"))
+      }
+    }
   })
   
   mutation.rates <- eventReactive(list(input$country,input$region),{
@@ -84,7 +178,7 @@ function(input, output, session) {
         readRDS(paste0("Data/Rates/",input$country,"_",input$region,".rds"))
       }
     }
-  },ignoreInit = T)
+  })
 
   clade.corr <- eventReactive(list(input$country,input$region),{
     if(any(metadata$Country==input$country & metadata$Region==input$region)) {
@@ -94,7 +188,84 @@ function(input, output, session) {
         readRDS(paste0("Data/Correlations/",input$country,"_",input$region,".rds"))
       }
     }
-  }, ignoreInit = T)
+  })
+  
+  output$plotCladePrevalences <- renderUI({
+    if(!is.null(clade.prevalences()) && length(input$rangePrevalence)>0) {
+      shinyjs::show('downCladePrevalencePlot')
+      shinyjs::show('downCladePrevalenceData')
+    } else {
+      shinyjs::hide('downCladePrevalencePlot')
+      shinyjs::hide('downCladePrevalenceData')
+    }
+    if(!is.null(clade.prevalences()) && length(input$rangePrevalence)>0)
+    {
+      ranges <- input$rangePrevalence
+      if(ranges[1]!=ranges[2])
+      {
+        start.interval <- which(colnames(clade.prevalences())==ranges[1])
+        end.interval <- which(colnames(clade.prevalences())==ranges[2])
+        if(length(start.interval)>0 && length(end.interval)>0)
+        {
+          #print(paste0(start.interval,"\t",end.interval))
+          plot.data <- compute.prevalences(clade.prevalences(),start.interval,end.interval)
+          prevalence.plot <- make.prevalence.plot(plot.data)
+          prevalence.plot <- ggplotly(prevalence.plot, tooltip = c("label","Clade","Percentage"), height=600) %>% 
+            config(displayModeBar = FALSE) %>%
+            layout(hoverlabel = list(font=list(size=17)), legend = list(title = list(text = "")))
+          box(width=12, height=600, solidHeader = T, renderPlotly(prevalence.plot))
+        }
+      } else {
+        shinyjs::hide('downCladePrevalencePlot')
+        shinyjs::hide('downCladePrevalenceData')
+      }
+    }
+  })
+  
+  output$plotCladeMutationRates <- renderUI({
+    if(length(input$clades)>0 && length(input$rangeCladeMutationRates)>0) {
+      shinyjs::show('downCladeMutRatesPlot')
+      shinyjs::show('downCladeMutRatesData')
+      shinyjs::show('topkMutations')
+      shinyjs::show('rangeCladeMutationRates')
+    } else {
+      shinyjs::hide('downCladeMutRatesPlot')
+      shinyjs::hide('downCladeMutRatesData')
+      shinyjs::hide('topkMutations')
+      shinyjs::hide('rangeCladeMutationRates')
+    }
+    if(length(input$clades)>0 && length(input$rangeCladeMutationRates)>0) 
+    {
+      ranges <- input$rangeCladeMutationRates
+      if(ranges[1]!=ranges[2])
+      {
+        if(ncol(clade.mutation.rates())==3) {
+          start.interval <- colnames(clade.mutation.rates())[3]
+          end.interval <- start.interval
+        } else {
+          start.interval <- which(colnames(clade.mutation.rates())==ranges[1])
+          end.interval <- which(colnames(clade.mutation.rates())==ranges[2])
+        }
+        if(length(start.interval)>0 && length(end.interval)>0)
+        {
+          plot.data <- compute.clade.frequent.mut(clade.mutation.rates(),clade.prevalences(),input$clades,start.interval,end.interval)
+          clade.mut.rates.plots <- make.clade.frequent.mut.plot(plot.data,as.numeric(input$topkMutations))
+          clade.mut.rates.plots <- lapply(clade.mut.rates.plots,function(bar.plot){
+            ggplotly(bar.plot, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
+              layout(hoverlabel = list(font=list(size=17)))
+          })
+          lapply(input$clades, function(clade) {
+            box(width=6, height=600, solidHeader=T, renderPlotly(clade.mut.rates.plots[[clade]]))
+          })
+        }
+      } else {
+        shinyjs::hide('downCladeMutRatesPlot')
+        shinyjs::hide('downCladeMutRatesData')
+        shinyjs::hide('topkMutations')
+        shinyjs::hide('rangeCladeMutationRates')
+      }
+    }
+  })
   
   output$plotRate <- renderUI({
     if(length(input$mutations)>0) {
@@ -104,7 +275,8 @@ function(input, output, session) {
       shinyjs::hide('downRatePlot')
       shinyjs::hide('downRateData')
     }
-    if(length(input$mutations)>0) {
+    #print(length(!grepl("Rate",names(mutation.rates()))))
+    if(length(input$mutations)>0 && length(!grepl("Rate",names(mutation.rates())))>0) {
       plot.rate <- make.temporal.plot(mutation.rates(),input$mutations)
       plot.rate <- ggplotly(plot.rate, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
         layout(hoverlabel = list(font=list(size=17)))
@@ -112,18 +284,52 @@ function(input, output, session) {
     }
     })
 
-  output$plotClade <- renderUI({
+  output$plotCladeDistribution <- renderUI({
     if(length(input$mutations)>0) {
-      shinyjs::show('downCladePlot')
-      shinyjs::show('downCladeData')
+      shinyjs::show('downCladeDistributionPlot')
+      shinyjs::show('downCladeDistributionData')
+      #shinyjs::show('topkCladeDistr')
     } else {
-      shinyjs::hide('downCladePlot')
-      shinyjs::hide('downCladeData')
+      shinyjs::hide('downCladeDistributionPlot')
+      shinyjs::hide('downCladeDistributionData')
+      #shinyjs::hide('topkCladeDistr')
     }
-    if(length(input$mutations)>0) {
-      clade.plots <- make.clade.interactive.plot(mutation.rates(),input$mutations)
+    if(length(input$mutations)>0) 
+    {
+      plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_absRate")
+      #clade.distribution.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeDistr))
+      clade.distribution.plots <- make.mut.frequency.plot(plot.data)
+      clade.distribution.plots <- lapply(clade.distribution.plots,function(plot){
+        ggplotly(plot, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
+          layout(hoverlabel = list(font=list(size=17)))
+      })
       lapply(input$mutations, function(mut) {
-        box(width=4, solidHeader=T, renderPlotly(clade.plots[[mut]]))
+        box(width=6, height=600, solidHeader=T, renderPlotly(clade.distribution.plots[[mut]]))
+      })
+    }
+  })
+  
+  output$plotCladeRates <- renderUI({
+    if(length(input$mutations)>0) {
+      shinyjs::show('downCladeRatesPlot')
+      shinyjs::show('downCladeRatesData')
+      #shinyjs::show('topkCladeRates')
+    } else {
+      shinyjs::hide('downCladeRatesPlot')
+      shinyjs::hide('downCladeRatesData')
+      #shinyjs::hide('topkCladeRates')
+    }
+    if(length(input$mutations)>0) 
+    {
+      plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_relRate")
+      #clade.rates.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeRates))
+      clade.rates.plots <- make.mut.frequency.plot(plot.data)
+      clade.rates.plots <- lapply(clade.rates.plots,function(plot){
+        ggplotly(plot, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
+          layout(hoverlabel = list(font=list(size=17)))
+      })
+      lapply(input$mutations, function(mut) {
+        box(width=6, height=600, solidHeader=T, renderPlotly(clade.rates.plots[[mut]]))
       })
     }
   })
@@ -208,6 +414,88 @@ function(input, output, session) {
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
+  output$downCladePrevalencePlot <- downloadHandler(
+    filename = function() {
+      paste0(input$country,"_",input$region,"_",paste0(input$rangePrevalence,collapse="_"),"_cladePrevalencePlot.png")
+    },
+    content = function(file) {
+      ranges <- input$rangePrevalence
+      start.interval <- which(colnames(clade.prevalences())==ranges[1])
+      end.interval <- which(colnames(clade.prevalences())==ranges[2])
+      plot.data <- compute.prevalences(clade.prevalences(),start.interval,end.interval)
+      ggsave(file,make.prevalence.plot(plot.data),width=6000,height=2000,units="px")
+    },
+    contentType = "text/png"
+  )
+  
+  output$downCladePrevalenceData <- downloadHandler(
+    filename = function() {
+      paste0(input$country,"_",input$region,"_",paste0(input$rangePrevalence,collapse="_"),"_cladePrevalences.xlsx")
+    },
+    content = function(file) {
+      ranges <- input$rangePrevalence
+      start.interval <- which(colnames(clade.prevalences())==ranges[1])
+      end.interval <- which(colnames(clade.prevalences())==ranges[2])
+      prevalence.data <- compute.prevalences(clade.prevalences(),start.interval,end.interval)
+      wb <- createWorkbook()
+      output.file <- paste0(paste0(input$rangePrevalence,collapse="_"))
+      addWorksheet(wb,output.file)
+      writeDataTable(wb, 1, prevalence.data, startRow = 1, startCol = 1)
+      saveWorkbook(wb,file)
+    },
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  )
+  
+  output$downCladeMutRatesPlot <- downloadHandler(
+    filename = function() {
+      paste0(input$country,"_",input$region,"_",paste0(input$clades,collapse="_"),"_",paste0(input$rangeCladeMutationRates,collapse="_"),paste0("_top",input$topk),"_cladeMutRatesPlot.png")
+    },
+    content = function(file) {
+      ranges <- input$rangeCladeMutationRates
+      if(ncol(clade.mutation.rates())==3) {
+        start.interval <- colnames(clade.mutation.rates())[3]
+        end.interval <- start.interval
+      } else {
+        start.interval <- which(colnames(clade.mutation.rates())==ranges[1])
+        end.interval <- which(colnames(clade.mutation.rates())==ranges[2])
+      }
+      plot.data <- compute.clade.frequent.mut(clade.mutation.rates(),clade.prevalences(),input$clades,start.interval,end.interval)
+      clade.mut.rates.plots <- make.clade.frequent.mut.plot(plot.data,as.numeric(input$topkMutations))
+      nrow <- ceiling(length(clade.mut.rates.plots)/2)
+      ncol <- min(length(clade.mut.rates.plots),2)
+      final.plot <- ggarrange(plotlist = clade.mut.rates.plots, nrow = nrow, ncol = ncol)
+      ggsave(file,final.plot,width=6000,height=2000*nrow,units="px")
+    },
+    contentType = "text/png"
+  )
+  
+  output$downCladeMutRatesData <- downloadHandler(
+    filename = function() {
+      paste0(input$country,"_",input$region,"_",paste0(input$clades,collapse="_"),"_",paste0(input$rangeCladeMutationRates,collapse="_"),"_cladeMutRatesPlot.xlsx")
+    },
+    content = function(file) {
+      ranges <- input$rangeCladeMutationRates
+      if(ncol(clade.mutation.rates())==3) {
+        start.interval <- colnames(clade.mutation.rates())[3]
+        end.interval <- start.interval
+      } else {
+        start.interval <- which(colnames(clade.mutation.rates())==ranges[1])
+        end.interval <- which(colnames(clade.mutation.rates())==ranges[2])
+      }
+      plot.data <- compute.clade.frequent.mut(clade.mutation.rates(),clade.prevalences(),input$clades,start.interval,end.interval)
+      wb <- createWorkbook()
+      clade.list <- unique(plot.data$Clade)
+      for(clade in clade.list)
+      {
+        sub.plot.data <- plot.data[plot.data$Clade==clade,]
+        addWorksheet(wb,clade)
+        writeDataTable(wb, clade, sub.plot.data, startRow = 1, startCol = 1)
+      }
+      saveWorkbook(wb,file)
+    },
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  )
+  
   output$downRatePlot <- downloadHandler(
     filename = function() {
       paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_temporalPlot.png")
@@ -234,34 +522,76 @@ function(input, output, session) {
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
-  output$downCladePlot <- downloadHandler(
+  output$downCladeDistributionPlot <- downloadHandler(
     filename = function() {
-      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladePie.png")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladeDistribution.png")
     },
     content = function(file) {
-      ggsave(file,make.clade.plot(mutation.rates(),input$mutations),width=6000,height=3000,units="px",bg = "white")
+      plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_absRate")
+      clade.distribution.plots <- make.mut.frequency.plot(plot.data)
+      #clade.distribution.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeDistr))
+      #nrow <- ceiling(length(clade.distribution.plots)/2)
+      #ncol <- min(length(clade.distribution.plots),2)
+      final.plot <- ggarrange(plotlist = clade.distribution.plots, nrow = length(clade.distribution.plots), ncol = 1)
+      ggsave(file,final.plot,width=6000,height=2000*length(clade.distribution.plots),units="px")
     },
     contentType = "text/png"
   )
 
-  output$downCladeData <- downloadHandler(
+  output$downCladeDistributionData <- downloadHandler(
     filename = function() {
-      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladeRates.xlsx")
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladeDistribution.xlsx")
     },
     content = function(file) {
-      sub.mutation.rates <- mutation.rates()[mutation.rates()$Mutation %in% input$mutations,grepl("Rate|Mutation",names(mutation.rates()))]
-      names(sub.mutation.rates) <- gsub("absRate","cladeFrequency",names(sub.mutation.rates))
-      names(sub.mutation.rates) <- gsub("relRate","cladeMutationRate",names(sub.mutation.rates))
+      plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_absRate")
       wb <- createWorkbook()
-      output.file <- paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"))
-      output.file <- gsub(":",".",output.file)
-      addWorksheet(wb,output.file)
-      writeDataTable(wb, 1, sub.mutation.rates, startRow = 1, startCol = 1)
+      mutation.list <- unique(plot.data$Mutation)
+      for(mutation in mutation.list)
+      {
+        sub.plot.data <- plot.data[plot.data$Mutation==mutation,]
+        addWorksheet(wb,gsub(":",".",mutation))
+        writeDataTable(wb,gsub(":",".",mutation), sub.plot.data, startRow = 1, startCol = 1)
+      }
       saveWorkbook(wb,file)
     },
     contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   )
 
+  output$downCladeRatesPlot <- downloadHandler(
+    filename = function() {
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladeRates.png")
+    },
+    content = function(file) {
+      plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_relRate")
+      clade.rates.plots <- make.mut.frequency.plot(plot.data)
+      #clade.rates.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeRates))
+      # nrow <- ceiling(length(clade.rates.plots)/2)
+      # ncol <- min(length(clade.rates.plots),2)
+      final.plot <- ggarrange(plotlist = clade.rates.plots, nrow = length(clade.rates.plots), ncol = 1)
+      ggsave(file,final.plot,width=6000,height=2000*length(clade.rates.plots),units="px")
+    },
+    contentType = "text/png"
+  )
+  
+  output$downCladeRatesData <- downloadHandler(
+    filename = function() {
+      paste0(input$country,"_",input$region,"_",paste0(input$mutations,collapse="_"),"_cladeRates.xlsx")
+    },
+    content = function(file) {
+      plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_relRate")
+      wb <- createWorkbook()
+      mutation.list <- unique(plot.data$Mutation)
+      for(mutation in mutation.list)
+      {
+        sub.plot.data <- plot.data[plot.data$Mutation==mutation,]
+        addWorksheet(wb,gsub(":",".",mutation))
+        writeDataTable(wb, gsub(":",".",mutation), sub.plot.data, startRow = 1, startCol = 1)
+      }
+      saveWorkbook(wb,file)
+    },
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  )
+  
   output$downCorrPlot <- downloadHandler(
     filename = function() {
       row <- input$tableCorr_rows_selected
