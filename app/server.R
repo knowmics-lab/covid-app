@@ -117,6 +117,33 @@ function(input, output, session) {
                     choicesOpt = list(content = c("All",sapply(unique(metadata$Country)[-1],build.country.icon))))
   
   observeEvent(input$country, {
+    if(input$country=="All") {
+      statText <- "&nbsp &nbsp GLOBAL DATA<br/>"
+    } else {
+      statText <- paste0("&nbsp &nbsp ",toupper(input$country),"<br/>")
+    }
+    statText <- paste0(statText,"&nbsp &nbsp Samples: ")
+    if(!is.null(clade.prevalences())) {
+      if(ncol(clade.prevalences())==1) {
+        statText <- paste0(statText,"not available<br/>")
+      }
+      else {
+        statText <- paste0(statText,format(sum(clade.prevalences()[,-1],na.rm = T),big.mark=","),"<br/>")
+      }
+    } else {
+      statText <- paste0(statText,format(sum(global.clade.prevalences[,-1],na.rm = T),big.mark=","),"<br/>")
+    } 
+    statText <- paste0(statText,"&nbsp &nbsp Infected: ")
+    if(!is.null(clade.prevalences())) {
+      if(paste0(input$country,"_",input$region) %in% colnames(population.data)) {
+        statText <- paste0(statText,format(sum(population.data[,paste0(input$country,"_",input$region)],na.rm = T),big.mark=","))
+      } else {
+        statText <- paste0(statText,"not available")
+      }
+    } else {
+      statText <- paste0(statText,format(sum(population.data[,"All_All"],na.rm = T),big.mark=","))
+    }
+    output$statsCountry <- renderUI({HTML(statText)})
     list.regions <- as.character(metadata[metadata$Country==input$country,"Region"])
     updatePickerInput(session, "region", choices=unique(c("All",list.regions)))
     updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
@@ -373,7 +400,8 @@ function(input, output, session) {
         shinyjs::hide('plotCorrOpt')
       }
       if(!is.null(row)) {
-        vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2")]
+        sub.clade.corr <- clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,]
+        vals <- sub.clade.corr[row,c("Mutation 1","Mutation 2")]
         temp.rates <- mutation.rates()[mutation.rates()$Mutation==vals[1,1] | mutation.rates()$Mutation==vals[1,2],,drop=F]
         plot.corr <- make.correlation.interactive.plot(temp.rates,input$plotCorrOpt)
         box(width=12, height=600, solidHeader = T, renderPlotly(plot.corr))
@@ -532,6 +560,12 @@ function(input, output, session) {
       #clade.distribution.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeDistr))
       #nrow <- ceiling(length(clade.distribution.plots)/2)
       #ncol <- min(length(clade.distribution.plots),2)
+      for(i in 1:length(clade.distribution.plots))
+      {
+        clade.distribution.plots[[i]] <- clade.distribution.plots[[i]] +
+          theme(axis.text.x=element_text(size=16, angle=90, color="black", vjust = 0.5),
+                axis.text.y=element_text(size=16, color="black"))
+      }
       final.plot <- ggarrange(plotlist = clade.distribution.plots, nrow = length(clade.distribution.plots), ncol = 1)
       ggsave(file,final.plot,width=6000,height=2000*length(clade.distribution.plots),units="px")
     },
@@ -567,6 +601,12 @@ function(input, output, session) {
       #clade.rates.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeRates))
       # nrow <- ceiling(length(clade.rates.plots)/2)
       # ncol <- min(length(clade.rates.plots),2)
+      for(i in 1:length(clade.rates.plots))
+      {
+        clade.rates.plots[[i]] <- clade.rates.plots[[i]] +
+          theme(axis.text.x=element_text(size=16, angle=90, color="black", vjust = 0.5),
+                axis.text.y=element_text(size=16, color="black"))
+      }
       final.plot <- ggarrange(plotlist = clade.rates.plots, nrow = length(clade.rates.plots), ncol = 1)
       ggsave(file,final.plot,width=6000,height=2000*length(clade.rates.plots),units="px")
     },
@@ -627,7 +667,7 @@ function(input, output, session) {
         names(temp.rates) <- gsub("_relRate","",names(temp.rates))
       }
       else
-        temp.rates <- temp.rates[,!grepl("Rate",names(temp.rates))]
+        temp.rates <- temp.rates[,!grepl("Rate|error",names(temp.rates))]
       writeDataTable(wb, 1, temp.rates, startRow = 1, startCol = 1)
       saveWorkbook(wb,file)
     },

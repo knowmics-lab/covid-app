@@ -207,7 +207,7 @@ make.correlation.interactive.plot <- function(pair.rates,corr.plot.opt)
     names(pair.rates) <- gsub("_relRate","",names(pair.rates))
   }
   else
-    pair.rates <- pair.rates[,!grepl("Rate|Mutation",names(pair.rates))]
+    pair.rates <- pair.rates[,!grepl("Rate|Mutation|error",names(pair.rates))]
   pair.rates <- pair.rates[,colSums(pair.rates)>0,drop=F]
   temporal.pair.rates <- data.frame(time=names(pair.rates),mut1=as.numeric(pair.rates[1,]),mut2=as.numeric(pair.rates[2,]))
   mut.rate.plot <- ggplot(temporal.pair.rates, aes(x=mut1, y=mut2, 
@@ -239,7 +239,7 @@ make.correlation.plot <- function(pair.rates,corr.plot.opt)
     names(pair.rates) <- gsub("_relRate","",names(pair.rates))
   }
   else
-    pair.rates <- pair.rates[,!grepl("Rate|Mutation",names(pair.rates))]
+    pair.rates <- pair.rates[,!grepl("Rate|Mutation|error",names(pair.rates))]
   pair.rates <- pair.rates[,colSums(pair.rates)>0,drop=F]
   temporal.pair.rates <- data.frame(time=names(pair.rates),mut1=as.numeric(pair.rates[1,]),mut2=as.numeric(pair.rates[2,]))
   mut.rate.plot <- ggplot(temporal.pair.rates, aes(x=mut1, y=mut2)) + 
@@ -267,7 +267,7 @@ make.heatmap.plot <- function(mut1, mut2, counts)
   final.plot <- ggplot(plot.data, aes(x = m1, y = m2)) +
     #ggtitle("Sample counts") +
     geom_tile(aes(fill = value),color="black") +
-    geom_text(aes(label = paste0("Samples: ",value)), color = "red", size=5) + 
+    geom_text(aes(label = paste0("<b>Samples:\n",format(value,big.mark=","),"</b>")), color = "red", size=4) + 
     scale_fill_gradient(high = "black", low = "white") +
     theme(legend.position = "none", 
           #panel.grid = element_blank(), 
@@ -286,7 +286,7 @@ make.heatmap.plot <- function(mut1, mut2, counts)
 
 build.country.icon <- function(country) {
   shiny::HTML(paste(
-    tags$img(src=paste0("https://alpha.dmi.unict.it/~gmicale/Icons/",country,".png"), width=30, height=22),
+    tags$img(src=paste0("Icons/",country,".png"), width=30, height=22),
     country
   ))
 }
@@ -297,3 +297,5 @@ global.clade.prevalences <- readRDS("Data/CladePrevalences/All_All.rds")
 global.clade.mutation.rates <- readRDS("Data/CladeMutationRates/All_All.rds")
 global.mutation.rates <- readRDS("Data/Rates/All_All.rds")
 global.clade.corr <- readRDS("Data/Correlations/All_All.rds")
+population.data <- readRDS("Data/population_data.rds")
+
