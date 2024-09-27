@@ -23,7 +23,10 @@ header <- dashboardHeader(title = span("CovidTGI", style = "color: white; font-s
 sidebar <- dashboardSidebar(
   sidebarMenu(
     pickerInput("country","Country",choices=NULL, options = list(size=10, style="picker")),
-    pickerInput("region","Region/State", choices=NULL, options = list(size=10, style = "picker"))
+    pickerInput("region","Region/State", choices=NULL, options = list(size=10, style = "picker")),
+    div(style = "margin-top: 25px;"),
+    htmlOutput("statsCountry", class="htmlStats"),
+    a(p("How to use", style = "margin-top:25px; margin-left:15px; color: lightblue; text-decoration: underline;"), target = "_blank", href = "prova")
   )
 )
 
@@ -120,7 +123,8 @@ body <- dashboardBody(
     tags$head(tags$style(HTML(".selectize-input { font-size: 16px; line-height: 18px;} .selectize-dropdown { font-size: 16px; line-height: 18px; }"))),
     tags$head(tags$style(HTML(".dropdown-menu ul li:nth-child(n) a { color: black !important; font-size: 16px;}"))),
     tags$head(tags$style(HTML(".picker {font-size: 16px; color: black; background-color: #EEEEEE;}"))),
-    tags$head(tags$style(HTML(".nav-tabs {font-size: 16px; font-weight: bold;}")))
+    tags$head(tags$style(HTML(".nav-tabs {font-size: 16px; font-weight: bold;}"))),
+    tags$head(tags$style(HTML("htmlStats {margin-top: 100px;}")))
   )
 )
 
