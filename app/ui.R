@@ -70,7 +70,7 @@ body <- dashboardBody(
                    box(width=12, title="Clade mutation rates", status="primary",solidHeader = T,collapsible = T,
                      fluidRow(column(width=4,
                       introBox(
-                        pickerInput("clades","Select one or more clades: ", choices=NULL, multiple = T, 
+                        pickerInput("clades","Select one or more clades: ", choices=global.clade.prevalences$Clade, multiple = T, 
                                  options = list(`live-search`=TRUE, size=10, style = "picker")),
                         data.step = 6,
                         data.intro = "Use this picker input to select the clades to show."

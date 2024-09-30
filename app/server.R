@@ -167,8 +167,8 @@ function(input, output, session) {
     output$statsCountry <- renderUI({HTML(statText)})
     list.regions <- as.character(metadata[metadata$Country==input$country,"Region"])
     updatePickerInput(session,"region", choices=unique(c("All",list.regions)))
-    updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
-    updatePickerInput(session,"clades",choices=clade.prevalences()$Clade)
+    updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation,selected = input$mutations)
+    updatePickerInput(session,"clades",choices=clade.prevalences()$Clade,selected = input$clades)
     if(!is.null(clade.prevalences()))
     {
       if(ncol(clade.prevalences())<3) {
@@ -186,7 +186,8 @@ function(input, output, session) {
   })
 
   observeEvent(input$region,{
-    updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
+    updatePickerInput(session,"clades",choices=clade.prevalences()$Clade,selected=input$clades)
+    updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation,selected=input$mutations)
     updateSliderTextInput(session,"rangePrevalence",choices=colnames(clade.prevalences())[-1],
                           selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
     updateSliderTextInput(session,"rangeCladeMutationRates",choices=colnames(clade.prevalences())[-1],
@@ -296,15 +297,18 @@ function(input, output, session) {
         }
         if(length(start.interval)>0 && length(end.interval)>0)
         {
-          plot.data <- compute.clade.frequent.mut(clade.mutation.rates(),clade.prevalences(),input$clades,start.interval,end.interval)
-          clade.mut.rates.plots <- make.clade.frequent.mut.plot(plot.data,as.numeric(input$topkMutations))
-          clade.mut.rates.plots <- lapply(clade.mut.rates.plots,function(bar.plot){
-            ggplotly(bar.plot, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
-              layout(hoverlabel = list(font=list(size=17)))
-          })
-          lapply(input$clades, function(clade) {
-            box(width=6, height=600, solidHeader=T, renderPlotly(clade.mut.rates.plots[[clade]]))
-          })
+          if(any(input$clades %in% clade.prevalences()$Clade))
+          {
+            plot.data <- compute.clade.frequent.mut(clade.mutation.rates(),clade.prevalences(),input$clades,start.interval,end.interval)
+            clade.mut.rates.plots <- make.clade.frequent.mut.plot(plot.data,as.numeric(input$topkMutations))
+            clade.mut.rates.plots <- lapply(clade.mut.rates.plots,function(bar.plot){
+              ggplotly(bar.plot, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
+                layout(hoverlabel = list(font=list(size=17)))
+            })
+            lapply(input$clades, function(clade) {
+              box(width=6, height=600, solidHeader=T, renderPlotly(clade.mut.rates.plots[[clade]]))
+            })
+          }
         }
       } else {
         shinyjs::hide('downCladeMutRatesPlot')
@@ -324,11 +328,15 @@ function(input, output, session) {
       shinyjs::hide('downRateData')
     }
     #print(length(!grepl("Rate",names(mutation.rates()))))
-    if(length(input$mutations)>0 && length(!grepl("Rate",names(mutation.rates())))>0) {
-      plot.rate <- make.temporal.plot(mutation.rates(),input$mutations)
-      plot.rate <- ggplotly(plot.rate, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
-        layout(hoverlabel = list(font=list(size=17)))
-      box(width=12, height=600, solidHeader = T, renderPlotly(plot.rate))
+    if(length(input$mutations)>0 && length(!grepl("Rate",names(mutation.rates())))>0) 
+    {
+      if(any(input$mutations %in% mutation.rates()$Mutation))
+      {
+        plot.rate <- make.temporal.plot(mutation.rates(),input$mutations)
+        plot.rate <- ggplotly(plot.rate, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
+          layout(hoverlabel = list(font=list(size=17)))
+        box(width=12, height=600, solidHeader = T, renderPlotly(plot.rate))
+      }
     }
     })
 
@@ -344,16 +352,19 @@ function(input, output, session) {
     }
     if(length(input$mutations)>0 && !is.null(mutation.rates())) 
     {
-      plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_absRate")
-      #clade.distribution.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeDistr))
-      clade.distribution.plots <- make.mut.frequency.plot(plot.data)
-      clade.distribution.plots <- lapply(clade.distribution.plots,function(plot){
-        ggplotly(plot, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
-          layout(hoverlabel = list(font=list(size=17)))
-      })
-      lapply(input$mutations, function(mut) {
-        box(width=6, height=600, solidHeader=T, renderPlotly(clade.distribution.plots[[mut]]))
-      })
+      if(any(input$mutations %in% mutation.rates()$Mutation))
+      {
+        plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_absRate")
+        #clade.distribution.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeDistr))
+        clade.distribution.plots <- make.mut.frequency.plot(plot.data)
+        clade.distribution.plots <- lapply(clade.distribution.plots,function(plot){
+          ggplotly(plot, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
+            layout(hoverlabel = list(font=list(size=17)))
+        })
+        lapply(input$mutations, function(mut) {
+          box(width=6, height=600, solidHeader=T, renderPlotly(clade.distribution.plots[[mut]]))
+        })
+      }
     }
   })
   
@@ -369,16 +380,19 @@ function(input, output, session) {
     }
     if(length(input$mutations)>0 && !is.null(mutation.rates())) 
     {
-      plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_relRate")
-      #clade.rates.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeRates))
-      clade.rates.plots <- make.mut.frequency.plot(plot.data)
-      clade.rates.plots <- lapply(clade.rates.plots,function(plot){
-        ggplotly(plot, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
-          layout(hoverlabel = list(font=list(size=17)))
-      })
-      lapply(input$mutations, function(mut) {
-        box(width=6, height=600, solidHeader=T, renderPlotly(clade.rates.plots[[mut]]))
-      })
+      if(any(input$mutations %in% mutation.rates()$Mutation))
+      {
+        plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_relRate")
+        #clade.rates.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeRates))
+        clade.rates.plots <- make.mut.frequency.plot(plot.data)
+        clade.rates.plots <- lapply(clade.rates.plots,function(plot){
+          ggplotly(plot, tooltip = "text", height=600) %>% config(displayModeBar = FALSE) %>%
+            layout(hoverlabel = list(font=list(size=17)))
+        })
+        lapply(input$mutations, function(mut) {
+          box(width=6, height=600, solidHeader=T, renderPlotly(clade.rates.plots[[mut]]))
+        })
+      }
     }
   })
 
