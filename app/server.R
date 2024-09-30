@@ -2,6 +2,27 @@ function(input, output, session) {
   
   #thematic::thematic_shiny()
   
+  observeEvent(input$help,{
+    updatePickerInput(session,"country", choices=unique(metadata$Country),
+                                 choicesOpt = list(content = c("All",sapply(unique(metadata$Country)[-1],build.country.icon))))
+    updatePickerInput(session,"region", choices=unique(c("All")))
+    updatePickerInput(session,"mutations",choices=global.mutation.rates$Mutation, selected=global.mutation.rates$Mutation[c(1,2)])
+    updatePickerInput(session,"clades",choices=global.clade.prevalences$Clade, selected=global.clade.prevalences$Clade[c(1,2)])
+    introjs(session, options = list("nextLabel"="Next", "prevLabel"="Previous", "skipLabel"="Close"),
+                     events = list(onbeforechange = I("
+        if (this._currentStep < 9) {
+          $('a[data-value=\"mutationTab\"]').removeClass('active');
+          $('a[data-value=\"cladeTab\"]').addClass('active');
+          $('a[data-value=\"cladeTab\"]').trigger('click');
+        } else {
+          $('a[data-value=\"cladeTab\"]').removeClass('active');
+          $('a[data-value=\"mutationTab\"]').addClass('active');
+          $('a[data-value=\"mutationTab\"]').trigger('click');
+        }
+        ")))
+  }
+  )
+  
   observe({
     if(length(input$mutations)>0) {
       shinyjs::show('external')
@@ -113,7 +134,7 @@ function(input, output, session) {
       }
   })
   
-  updatePickerInput(session, "country", choices=unique(metadata$Country), 
+  updatePickerInput(session, "country", choices=unique(metadata$Country),
                     choicesOpt = list(content = c("All",sapply(unique(metadata$Country)[-1],build.country.icon))))
   
   observeEvent(input$country, {
@@ -132,7 +153,7 @@ function(input, output, session) {
       }
     } else {
       statText <- paste0(statText,format(sum(global.clade.prevalences[,-1],na.rm = T),big.mark=","),"<br/>")
-    } 
+    }
     statText <- paste0(statText,"&nbsp &nbsp Infected: ")
     if(!is.null(clade.prevalences())) {
       if(paste0(input$country,"_",input$region) %in% colnames(population.data)) {
@@ -145,7 +166,7 @@ function(input, output, session) {
     }
     output$statsCountry <- renderUI({HTML(statText)})
     list.regions <- as.character(metadata[metadata$Country==input$country,"Region"])
-    updatePickerInput(session, "region", choices=unique(c("All",list.regions)))
+    updatePickerInput(session,"region", choices=unique(c("All",list.regions)))
     updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
     updatePickerInput(session,"clades",choices=clade.prevalences()$Clade)
     if(!is.null(clade.prevalences()))
@@ -163,7 +184,7 @@ function(input, output, session) {
       }
     }
   })
-  
+
   observeEvent(input$region,{
     updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation)
     updateSliderTextInput(session,"rangePrevalence",choices=colnames(clade.prevalences())[-1],
@@ -171,7 +192,7 @@ function(input, output, session) {
     updateSliderTextInput(session,"rangeCladeMutationRates",choices=colnames(clade.prevalences())[-1],
                           selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
   })
-  
+
   observeEvent(input$mutations, {
     updatePickerInput(session,"mutations",choices = unique(c(input$mutations,mutation.rates()$Mutation)),
                       selected = input$mutations)
@@ -250,7 +271,7 @@ function(input, output, session) {
   })
   
   output$plotCladeMutationRates <- renderUI({
-    if(length(input$clades)>0 && length(input$rangeCladeMutationRates)>0) {
+    if(length(input$clades)>0 && length(input$rangeCladeMutationRates)>0 && !is.null(clade.prevalences())) {
       shinyjs::show('downCladeMutRatesPlot')
       shinyjs::show('downCladeMutRatesData')
       shinyjs::show('topkMutations')
@@ -261,7 +282,7 @@ function(input, output, session) {
       shinyjs::hide('topkMutations')
       shinyjs::hide('rangeCladeMutationRates')
     }
-    if(length(input$clades)>0 && length(input$rangeCladeMutationRates)>0) 
+    if(length(input$clades)>0 && length(input$rangeCladeMutationRates)>0 && !is.null(clade.prevalences())) 
     {
       ranges <- input$rangeCladeMutationRates
       if(ranges[1]!=ranges[2])
@@ -312,7 +333,7 @@ function(input, output, session) {
     })
 
   output$plotCladeDistribution <- renderUI({
-    if(length(input$mutations)>0) {
+    if(length(input$mutations)>0 && !is.null(mutation.rates())) {
       shinyjs::show('downCladeDistributionPlot')
       shinyjs::show('downCladeDistributionData')
       #shinyjs::show('topkCladeDistr')
@@ -321,7 +342,7 @@ function(input, output, session) {
       shinyjs::hide('downCladeDistributionData')
       #shinyjs::hide('topkCladeDistr')
     }
-    if(length(input$mutations)>0) 
+    if(length(input$mutations)>0 && !is.null(mutation.rates())) 
     {
       plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_absRate")
       #clade.distribution.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeDistr))
@@ -337,7 +358,7 @@ function(input, output, session) {
   })
   
   output$plotCladeRates <- renderUI({
-    if(length(input$mutations)>0) {
+    if(length(input$mutations)>0 && !is.null(mutation.rates())) {
       shinyjs::show('downCladeRatesPlot')
       shinyjs::show('downCladeRatesData')
       #shinyjs::show('topkCladeRates')
@@ -346,7 +367,7 @@ function(input, output, session) {
       shinyjs::hide('downCladeRatesData')
       #shinyjs::hide('topkCladeRates')
     }
-    if(length(input$mutations)>0) 
+    if(length(input$mutations)>0 && !is.null(mutation.rates())) 
     {
       plot.data <- compute.mut.frequencies(mutation.rates(),input$mutations,"_relRate")
       #clade.rates.plots <- make.mut.frequency.plot(plot.data,as.numeric(input$topkCladeRates))
@@ -364,16 +385,15 @@ function(input, output, session) {
   output$tableCorr <- DT::renderDT({
     corr.table <- clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,]
     corr.table <- corr.table[,c("Clade","Mutation 1","Mutation 2","Correlation","FDR")]
-    corr.table <- datatable(corr.table, selection="single", rownames=F, filter="top", options = list(
+    corr.table <- datatable(corr.table, selection = list(mode="single", selected = 1), rownames=F, filter="top", options = list(
       dom = "tp", pageLength = 25,
       rowCallback = JS(
         "function(row, data) {",
         "$('td:eq(4)', row).html(data[4].toExponential(2));",
-        #"$('td:eq(5)', row).html(data[5].toExponential(2));",
         "}")
     )
     )
-    if(length(input$mutations)>0) {
+    if(!is.null(mutation.rates()) && length(input$mutations)>0) {
       if(nrow(corr.table$x$data)>0) {
         shinyjs::show('downCorrTab')
       } else {
@@ -402,9 +422,15 @@ function(input, output, session) {
       if(!is.null(row)) {
         sub.clade.corr <- clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,]
         vals <- sub.clade.corr[row,c("Mutation 1","Mutation 2")]
-        temp.rates <- mutation.rates()[mutation.rates()$Mutation==vals[1,1] | mutation.rates()$Mutation==vals[1,2],,drop=F]
-        plot.corr <- make.correlation.interactive.plot(temp.rates,input$plotCorrOpt)
-        box(width=12, height=600, solidHeader = T, renderPlotly(plot.corr))
+        if(is.na(vals[1,1])) {
+          shinyjs::hide('downCorrPlot')
+          shinyjs::hide('downCorrPlotData')
+          shinyjs::hide('plotCorrOpt')
+        } else {
+          temp.rates <- mutation.rates()[mutation.rates()$Mutation==vals[1,1] | mutation.rates()$Mutation==vals[1,2],,drop=F]
+          plot.corr <- make.correlation.interactive.plot(temp.rates,input$plotCorrOpt)
+          box(width=12, height=600, solidHeader = T, renderPlotly(plot.corr))
+        }
       }
     } else {
       shinyjs::hide('downCorrPlot')
@@ -419,8 +445,10 @@ function(input, output, session) {
       row <- input$tableCorr_rows_selected
       if(!is.null(row)) {
         vals <- (clade.corr()[clade.corr()$`Mutation 1` %in% input$mutations | clade.corr()$`Mutation 2` %in% input$mutations,])[row,c("Mutation 1","Mutation 2","Cont00","Cont01","Cont10","Cont11")]
-        heatmap.plot <- make.heatmap.plot(vals[1,1],vals[1,2],as.numeric(vals[1,-c(1,2)]))
-        box(width=7, height=400, solidHeader = T, renderPlotly(heatmap.plot))
+        if(!is.na(vals[1,1])) {
+          heatmap.plot <- make.heatmap.plot(vals[1,1],vals[1,2],as.numeric(vals[1,-c(1,2)]))
+          box(width=7, height=400, solidHeader = T, renderPlotly(heatmap.plot))
+        }
       }
     }
   })
