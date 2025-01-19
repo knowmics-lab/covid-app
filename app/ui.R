@@ -67,7 +67,7 @@ body <- dashboardBody(
                ),
                fluidRow(
                  introBox(
-                   box(width=12, title="Clade mutation rates", status="primary",solidHeader = T,collapsible = T,
+                   box(width=12, title="Clade observed mutation frequencies", status="primary",solidHeader = T,collapsible = T,
                      fluidRow(column(width=4,
                       introBox(
                         pickerInput("clades","Select one or more clades: ", choices=global.clade.prevalences$Clade, multiple = T, 

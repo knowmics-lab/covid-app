@@ -186,6 +186,33 @@ function(input, output, session) {
   })
 
   observeEvent(input$region,{
+    if(input$country=="All") {
+      statText <- "&nbsp &nbsp GLOBAL DATA<br/>"
+    } else {
+      statText <- paste0("&nbsp &nbsp ",toupper(paste0(input$country," - ",input$region)),"<br/>")
+    }
+    statText <- paste0(statText,"&nbsp &nbsp Samples: ")
+    if(!is.null(clade.prevalences())) {
+      if(ncol(clade.prevalences())==1) {
+        statText <- paste0(statText,"not available<br/>")
+      }
+      else {
+        statText <- paste0(statText,format(sum(clade.prevalences()[,-1],na.rm = T),big.mark=","),"<br/>")
+      }
+    } else {
+      statText <- paste0(statText,format(sum(global.clade.prevalences[,-1],na.rm = T),big.mark=","),"<br/>")
+    }
+    statText <- paste0(statText,"&nbsp &nbsp Infected: ")
+    if(!is.null(clade.prevalences())) {
+      if(paste0(input$country,"_",input$region) %in% colnames(population.data)) {
+        statText <- paste0(statText,format(sum(population.data[,paste0(input$country,"_",input$region)],na.rm = T),big.mark=","))
+      } else {
+        statText <- paste0(statText,"not available")
+      }
+    } else {
+      statText <- paste0(statText,format(sum(population.data[,"All_All"],na.rm = T),big.mark=","))
+    }
+    output$statsCountry <- renderUI({HTML(statText)})
     updatePickerInput(session,"clades",choices=clade.prevalences()$Clade,selected=input$clades)
     updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation,selected=input$mutations)
     updateSliderTextInput(session,"rangePrevalence",choices=colnames(clade.prevalences())[-1],
