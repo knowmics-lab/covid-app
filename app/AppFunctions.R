@@ -291,11 +291,10 @@ build.country.icon <- function(country) {
   ))
 }
 
-metadata <- data.frame(do.call(rbind, strsplit(gsub(".rds","",list.files("Data/Correlations")),"_")))
+metadata <- data.frame(do.call(rbind, strsplit(gsub(".rds","",list.files("Data/Rates")),"_")))
 names(metadata) <- c("Country","Region")
 global.clade.prevalences <- readRDS("Data/CladePrevalences/All_All.rds")
 global.clade.mutation.rates <- readRDS("Data/CladeMutationRates/All_All.rds")
 global.mutation.rates <- readRDS("Data/Rates/All_All.rds")
 global.clade.corr <- readRDS("Data/Correlations/All_All.rds")
 population.data <- readRDS("Data/population_data.rds")
-

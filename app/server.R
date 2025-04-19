@@ -261,7 +261,12 @@ function(input, output, session) {
       if(input$country=="All" && input$region=="All") {
         global.clade.corr
       } else {
-        readRDS(paste0("Data/Correlations/",input$country,"_",input$region,".rds"))
+        if(file.exists(paste0("Data/Correlations/",input$country,"_",input$region,".rds"))){
+          readRDS(paste0("Data/Correlations/",input$country,"_",input$region,".rds"))
+        } else {
+          data.frame(matrix(ncol=9,nrow=0, dimnames=list(NULL, 
+            c("Clade","Mutation 1","Mutation 2","Correlation","FDR","Cont00","Cont01","Cont10","Cont11"))))
+        }
       }
     }
   })
