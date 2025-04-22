@@ -215,10 +215,20 @@ function(input, output, session) {
     output$statsCountry <- renderUI({HTML(statText)})
     updatePickerInput(session,"clades",choices=clade.prevalences()$Clade,selected=input$clades)
     updatePickerInput(session,"mutations",choices=mutation.rates()$Mutation,selected=input$mutations)
-    updateSliderTextInput(session,"rangePrevalence",choices=colnames(clade.prevalences())[-1],
-                          selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
-    updateSliderTextInput(session,"rangeCladeMutationRates",choices=colnames(clade.prevalences())[-1],
-                          selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
+    if(!is.null(clade.prevalences()))
+    {
+      if(ncol(clade.prevalences())<3) {
+        shinyjs::hide('rangePrevalence')
+        shinyjs::hide('rangeCladeMutationRates')
+      } else {
+        shinyjs::show('rangePrevalence')
+        shinyjs::show('rangeCladeMutationRates')
+        updateSliderTextInput(session,"rangePrevalence",choices=colnames(clade.prevalences())[-1],
+                              selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
+        updateSliderTextInput(session,"rangeCladeMutationRates",choices=colnames(clade.prevalences())[-1],
+                              selected=colnames(clade.prevalences())[c(2,ncol(clade.prevalences()))])
+      }
+    }
   })
 
   observeEvent(input$mutations, {
@@ -265,7 +275,8 @@ function(input, output, session) {
           readRDS(paste0("Data/Correlations/",input$country,"_",input$region,".rds"))
         } else {
           data.frame(matrix(ncol=9,nrow=0, dimnames=list(NULL, 
-            c("Clade","Mutation 1","Mutation 2","Correlation","FDR","Cont00","Cont01","Cont10","Cont11"))))
+            c("Clade","Mutation 1","Mutation 2","Correlation","FDR","Cont00","Cont01","Cont10","Cont11"))),
+            check.names = F)
         }
       }
     }
